@@ -1,0 +1,6 @@
+@SchneeJob_HostAddress = http://localhost:5008
+
+GET {{SchneeJob_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
