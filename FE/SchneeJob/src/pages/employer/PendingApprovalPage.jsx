@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiClock, FiCheckCircle, FiXCircle, FiMail, FiPhone, FiHome, FiRefreshCw } from 'react-icons/fi';
 import { useAuth } from '../../contexts/AuthContext';
+import companyService from '../../services/companyService';
 
 const PendingApprovalPage = () => {
   const { user } = useAuth();
@@ -13,12 +14,17 @@ const PendingApprovalPage = () => {
     loadRequest();
   }, [user]);
 
-  const loadRequest = () => {
+  const loadRequest = async () => {
     setLoading(true);
-    const requests = JSON.parse(localStorage.getItem('companyRequests') || '[]');
-    const userRequest = requests.find(r => r.requestedBy === user?.id);
-    setRequest(userRequest);
-    setLoading(false);
+    try {
+      const res = await companyService.getMyRegistration();
+      setRequest(res.data);
+    } catch (error) {
+      console.error('Failed to load registration:', error);
+      setRequest(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getStatusInfo = (status) => {
@@ -118,7 +124,7 @@ const PendingApprovalPage = () => {
           {/* Company Info */}
           <div className="p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Thông tin công ty</h3>
-            
+
             <div className="flex items-center gap-4 mb-6">
               <img
                 src={request.logo}
@@ -167,19 +173,19 @@ const PendingApprovalPage = () => {
                 <FiRefreshCw className="w-4 h-4" />
                 Làm mới
               </button>
-              
+
               {request.status === 'approved' && (
                 <Link to="/employer/dashboard" className="btn-primary flex-1 text-center">
                   Vào Dashboard
                 </Link>
               )}
-              
+
               {request.status === 'rejected' && (
                 <Link to="/employer/company/create" className="btn-primary flex-1 text-center">
                   Đăng ký lại
                 </Link>
               )}
-              
+
               <Link to="/" className="btn-secondary">
                 Về trang chủ
               </Link>

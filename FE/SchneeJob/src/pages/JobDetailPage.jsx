@@ -11,13 +11,16 @@ import resumeService from '../services/resumeService';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Modal } from '../components/common/Modal';
+import { useLanguage } from '../contexts/LanguageContext';
 import { toast } from 'react-toastify';
+import { FiXCircle, FiAlertTriangle } from 'react-icons/fi';
 
 const JobDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getJobWithCompany, toggleSaveJob, savedJobs, applyForJob, compareJobs, toggleCompareJob } = useJobs();
+  const { getJobWithCompany, toggleSaveJob, savedJobs, applyForJob, compareJobs, toggleCompareJob, allJobs, isLoading: isJobsLoading } = useJobs();
   const { user, isAuthenticated, isJobSeeker } = useAuth();
+  const { t } = useLanguage();
 
   const [job, setJob] = useState(null);
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
@@ -29,12 +32,16 @@ const JobDetailPage = () => {
   const [activeTab, setActiveTab] = useState('description');
 
   useEffect(() => {
+    if (isJobsLoading && allJobs.length === 0) {
+      return;
+    }
+
     const jobData = getJobWithCompany(id);
     if (jobData) {
       setJob(jobData);
     }
     setIsLoading(false);
-  }, [id]);
+  }, [id, allJobs, isJobsLoading]);
 
   useEffect(() => {
     const loadResumes = async () => {
@@ -71,8 +78,13 @@ const JobDetailPage = () => {
     );
   }
 
-  const isSaved = savedJobs.includes(job.id);
+  const isSaved = savedJobs.some(j => (String(j.id) === String(job.id)) || (String(j.jobId || '') === String(job.id)));
   const isCompared = compareJobs.includes(job.id);
+
+  // Check job availability
+  const isExpired = job.deadline && new Date(job.deadline) < new Date();
+  const isClosed = job.status === 'closed' || job.status === 'filled';
+  const isAvailable = !isExpired && !isClosed;
 
   const formatSalary = (salary) => {
     if (!salary) return 'Thương lượng';
@@ -203,9 +215,39 @@ const JobDetailPage = () => {
                 ))}
               </div>
 
+              {/* Job Availability Alert */}
+              {(!isAvailable) && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`mt-6 p-4 rounded-xl border flex items-start gap-3 ${isClosed
+                    ? 'bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400'
+                    : 'bg-orange-50 border-orange-200 text-orange-800 dark:bg-orange-900/20 dark:border-orange-800 dark:text-orange-400'
+                    }`}
+                >
+                  {isClosed ? <FiXCircle className="w-6 h-6 shrink-0" /> : <FiAlertTriangle className="w-6 h-6 shrink-0" />}
+                  <div>
+                    <h4 className="font-bold text-lg mb-1">
+                      {isClosed ? t('jobClosed') : t('jobExpired')}
+                    </h4>
+                    <p className="text-sm opacity-90">
+                      {isClosed ? t('jobNoLongerAccepting') : t('applicationDeadlinePassed')}
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+
               <div className="flex flex-wrap gap-3 mt-8 pt-8 border-t border-gray-100 dark:border-gray-700">
-                <button onClick={handleApply} className="flex-1 bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-xl font-bold text-lg shadow-lg shadow-primary-600/30 transition-transform active:scale-95 flex items-center justify-center gap-2">
-                  <FiSend className="w-5 h-5" /> Ứng tuyển ngay
+                <button
+                  onClick={handleApply}
+                  disabled={!isAvailable}
+                  className={`flex-1 px-8 py-3 rounded-xl font-bold text-lg shadow-lg transition-transform flex items-center justify-center gap-2 ${isAvailable
+                    ? 'bg-primary-600 hover:bg-primary-700 text-white shadow-primary-600/30 active:scale-95'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none'
+                    }`}
+                >
+                  <FiSend className="w-5 h-5" />
+                  {isAvailable ? t('applyNow') : t('jobUnavailable')}
                 </button>
                 <button onClick={handleSave} className={`px-4 py-3 rounded-xl border-2 font-semibold transition-colors flex items-center gap-2 ${isSaved ? 'border-red-500 text-red-500 bg-red-50' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
                   <FiHeart className={`w-6 h-6 ${isSaved ? 'fill-current' : ''}`} />
@@ -241,7 +283,7 @@ const JobDetailPage = () => {
                 ))}
               </div>
               <div className="p-8">
-                <div className="prose dark:prose-invert max-w-none text-gray-600 dark:text-gray-300 leading-relaxed">
+                <div className="prose dark:prose-invert max-w-none text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-line">
                   <div dangerouslySetInnerHTML={{ __html: job[activeTab] }} />
                 </div>
               </div>

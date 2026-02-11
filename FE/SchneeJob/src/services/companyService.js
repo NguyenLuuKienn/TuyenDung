@@ -28,6 +28,28 @@ const mapCompany = (c) => {
   };
 };
 
+// Map registration response
+const mapCompanyRegistration = (r) => {
+  if (!r) return null;
+  return {
+    id: r.requestId || r.RequestId,
+    name: r.companyName || r.CompanyName,
+    email: r.contactPersonEmail || r.ContactPersonEmail,
+    phone: r.companyPhoneNumber || r.CompanyPhoneNumber,
+    website: r.website || r.Website,
+    logo: r.logoURL || r.LogoURL,
+    cover: r.coverImageURL || r.CoverImageURL,
+    industry: r.industryId || r.IndustryId,
+    address: r.address || r.Address,
+    status: (r.status || r.Status || 'pending').toLowerCase(),
+    submittedAt: r.requestedAt || r.RequestedAt,
+    reviewNote: r.adminNotes || r.AdminNotes,
+    // Note: TaxCode is missing in backend model
+    taxCode: r.taxCode || r.TaxCode || 'N/A',
+    raw: r
+  };
+};
+
 const companyService = {
   getAll: async () => {
     try {
@@ -57,6 +79,19 @@ const companyService = {
   },
 
   getMyCompany: () => api.get('/api/companies/my-company'),
+
+  getMyRegistration: async () => {
+    try {
+      const res = await api.get('/api/companyregistrations/my-registration');
+      res.data = mapCompanyRegistration(res.data);
+      return res;
+    } catch (error) {
+      if (error.response?.status === 404) {
+        return { data: null };
+      }
+      throw error;
+    }
+  },
 
   updateMyCompany: (companyData) =>
     api.put('/api/companies/my-company', companyData),

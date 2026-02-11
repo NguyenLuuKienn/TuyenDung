@@ -6,5 +6,6 @@ namespace SchneeJob.Interfaces
     {
         Task<CompanyRegistration> SubmitRegistrationAsync(CompanyRegistration request);
         Task<List<CompanyRegistration>> GetAllRegistrationsAsync();
+        Task<List<CompanyRegistration>> GetRegistrationsByEmailAsync(string email);
     }
 }

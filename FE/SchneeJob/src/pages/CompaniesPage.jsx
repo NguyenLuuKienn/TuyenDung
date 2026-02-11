@@ -54,7 +54,6 @@ const CompaniesPage = () => {
     <div className="min-h-screen bg-gray-50/50 dark:bg-gray-900 transition-colors pb-20">
       {/* Modern Header */}
       <div className="relative bg-white dark:bg-gray-800 pt-16 pb-24 overflow-hidden border-b border-gray-100 dark:border-gray-700">
-        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary-400 via-purple-500 to-pink-500"></div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
           <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 dark:text-white mb-6">
             {t('companyHeaderTitle1')} <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-purple-600">{t('companyHeaderTitle2')}</span>

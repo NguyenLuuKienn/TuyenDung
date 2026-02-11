@@ -80,7 +80,6 @@ namespace SchneeJob.Controllers
 
             if (!response.Success)
             {
-                // If service indicates account is disabled, return 403 Forbidden with a JSON message
                 if (response.Message == "AccountDisabled")
                 {
                     return StatusCode(StatusCodes.Status403Forbidden, new { message = "Account is disabled. Contact administrator." });

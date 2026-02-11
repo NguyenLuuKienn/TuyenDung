@@ -34,6 +34,44 @@ const SocialPost = ({ post }) => {
         checkLikeStatus();
     }, [post.postId, isAuthenticated]);
 
+    const formatJobSalary = (job) => {
+        if (!job) return 'Thương lượng';
+
+        // Check for normalized salary object first
+        if (job.salary) {
+            const { min, max, negotiable } = job.salary;
+            if (negotiable || (!min && !max)) return 'Thương lượng';
+
+            const formatNumber = (num) => {
+                if (num >= 1000000) return `${(num / 1000000).toFixed(0)} triệu`;
+                if (num >= 1000) return `${(num / 1000).toFixed(0)}k`;
+                return num;
+            };
+
+            if (min && max) return `${formatNumber(min)} - ${formatNumber(max)}`;
+            if (min) return `Từ ${formatNumber(min)}`;
+            if (max) return `Đến ${formatNumber(max)}`;
+            return 'Thương lượng';
+        }
+
+        // Check for raw fields (camelCase or PascalCase)
+        const min = Number(job.salaryMin || job.SalaryMin);
+        const max = Number(job.salaryMax || job.SalaryMax);
+
+        if (!min && !max) return 'Thương lượng';
+
+        const formatNumber = (num) => {
+            if (num >= 1000000) return `${(num / 1000000).toFixed(0)} triệu`;
+            if (num >= 1000) return `${(num / 1000).toFixed(0)}k`;
+            return num;
+        };
+
+        if (min > 0 && max > 0) return `${formatNumber(min)} - ${formatNumber(max)}`;
+        if (min > 0) return `Từ ${formatNumber(min)}`;
+        if (max > 0) return `Đến ${formatNumber(max)}`;
+        return 'Thương lượng';
+    };
+
     const handleLike = async () => {
         if (!isAuthenticated) {
             Swal.fire({
@@ -180,7 +218,7 @@ const SocialPost = ({ post }) => {
                             <h4 className="font-bold text-gray-900 dark:text-white mb-1 line-clamp-1">{post.job.title}</h4>
                             <div className="flex flex-wrap gap-y-1 gap-x-4 text-sm text-gray-500 dark:text-gray-400">
                                 <span className="flex items-center gap-1">
-                                    <FiBriefcase className="w-4 h-4" /> {post.job.salaryMin ? `${(post.job.salaryMin / 1000000).toFixed(0)} - ${(post.job.salaryMax / 1000000).toFixed(0)} triệu` : 'Thương lượng'}
+                                    <FiBriefcase className="w-4 h-4" /> {formatJobSalary(post.job)}
                                 </span>
                                 <span className="flex items-center gap-1">
                                     <FiMapPin className="w-4 h-4" /> {post.job.location}

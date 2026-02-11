@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -11,12 +11,14 @@ import { useNotifications } from '../../contexts/NotificationContext';
 import { useChat } from '../../contexts/ChatWidgetContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import companyService from '../../services/companyService';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [companyRegistrationStatus, setCompanyRegistrationStatus] = useState(null);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -25,6 +27,24 @@ const Header = () => {
   const { getTotalUnreadCount } = useChat();
   const { t, language, changeLanguage } = useLanguage();
   const { theme, toggleTheme } = useTheme();
+
+  // Check company registration status for employers
+  useEffect(() => {
+    const checkRegistrationStatus = async () => {
+      if (isEmployer && isAuthenticated) {
+        try {
+          const res = await companyService.getMyRegistration();
+          if (res.data) {
+            setCompanyRegistrationStatus(res.data.status);
+          }
+        } catch (error) {
+          // If no registration found, status is null
+          setCompanyRegistrationStatus(null);
+        }
+      }
+    };
+    checkRegistrationStatus();
+  }, [isEmployer, isAuthenticated]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -37,6 +57,15 @@ const Header = () => {
     logout();
     navigate('/');
     setIsProfileOpen(false);
+  };
+
+  const handleEmployerMenuClick = (e, to) => {
+    // If employer has pending registration, redirect to pending page
+    if (isEmployer && companyRegistrationStatus === 'pending') {
+      e.preventDefault();
+      navigate('/employer/pending');
+      setIsProfileOpen(false);
+    }
   };
 
   const navLinks = [
@@ -248,7 +277,7 @@ const Header = () => {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 10 }}
-                        className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden"
+                        className="absolute -right-10 mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden"
                       >
                         <div className="p-4 border-b border-gray-100">
                           <p className="font-semibold text-gray-900 dark:text-white">
@@ -261,7 +290,13 @@ const Header = () => {
                             <Link
                               key={item.to}
                               to={item.to}
-                              onClick={() => setIsProfileOpen(false)}
+                              onClick={(e) => {
+                                if (isEmployer) {
+                                  handleEmployerMenuClick(e, item.to);
+                                } else {
+                                  setIsProfileOpen(false);
+                                }
+                              }}
                               className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white transition-colors"
                             >
                               <item.icon className="w-5 h-5" />

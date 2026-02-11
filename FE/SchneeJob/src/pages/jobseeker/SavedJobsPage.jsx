@@ -41,7 +41,7 @@ const SavedJobsPage = () => {
         break;
     }
     return result;
-  }, [searchTerm, sortBy]);
+  }, [searchTerm, sortBy, getSavedJobs]);
 
   const handleRemove = async (jobId) => {
     const success = await toggleSaveJob(jobId);

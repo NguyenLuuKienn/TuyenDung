@@ -36,5 +36,13 @@ namespace SchneeJob.Services
                 .OrderByDescending(r => r.RequestedAt)
                 .ToListAsync();
         }
+
+        public async Task<List<CompanyRegistration>> GetRegistrationsByEmailAsync(string email)
+        {
+            return await _context.CompanyRegistrations
+                .Where(r => r.ContactPersonEmail == email)
+                .OrderByDescending(r => r.RequestedAt)
+                .ToListAsync();
+        }
     }
 }

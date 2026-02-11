@@ -48,7 +48,6 @@ namespace SchneeJob.Services
             var user = await _context.Users.FindAsync(userId);
             if (user == null) return false;
 
-            // Soft-delete: mark as inactive to preserve relations and avoid FK complications
             user.IsActive = false;
             _context.Users.Update(user);
             return await _context.SaveChangesAsync() > 0;
@@ -70,7 +69,6 @@ namespace SchneeJob.Services
             return await _context.SaveChangesAsync() > 0;
         }
 
-        // --- Job Management ---
         public async Task<IEnumerable<Job>> GetAllJobsAsync(string searchTerm, int pageNumber, int pageSize)
         {
             var query = _context.Jobs.Include(j => j.Company).AsNoTracking();
@@ -80,7 +78,6 @@ namespace SchneeJob.Services
                 query = query.Where(j => j.JobTitle.Contains(searchTerm) || j.Company.CompanyName.Contains(searchTerm));
             }
 
-            // Chỉ phân trang và trả về
             var jobs = await query
                 .OrderByDescending(j => j.CreatedAt)
                 .Skip((pageNumber - 1) * pageSize)
@@ -171,7 +168,7 @@ namespace SchneeJob.Services
                     PhoneNumber = request.CompanyPhoneNumber ?? "",
                     Address = request.Address ?? "",
                     IndustryId = request.IndustryId,
-                    IsVerified = true, // Admin duyệt nên mặc định là đã xác thực
+                    IsVerified = true, 
                     City = "",
                     CompanyDescription = "",
                     CompanyEmail = request.ContactPersonEmail ?? "",
@@ -183,18 +180,15 @@ namespace SchneeJob.Services
                 _context.Companies.Add(newCompany);
                 await _context.SaveChangesAsync();
 
-                // Check if user already exists with this email
                 var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.ContactPersonEmail);
                 
                 if (existingUser != null)
                 {
-                    // Update existing user with company ID
                     existingUser.CompanyId = newCompany.CompanyId;
                     _context.Users.Update(existingUser);
                 }
                 else
                 {
-                    // Create new user only if doesn't exist
                     var tempPassword = GenerateRandomPassword();
                     var newUser = new User
                     {

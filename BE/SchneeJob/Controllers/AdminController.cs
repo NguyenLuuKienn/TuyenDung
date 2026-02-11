@@ -17,7 +17,6 @@ namespace SchneeJob.Controllers
         {
             _adminServices = adminServices;
         }
-        // GET: api/admin/users?searchTerm=test&page=1&size=10
         [HttpGet("users")]
         public async Task<IActionResult> GetUsers()
         {
@@ -35,14 +34,12 @@ namespace SchneeJob.Controllers
             }
             catch (Exception ex)
             {
-                // Return detailed error for debugging client-side validation issues
                 var inner = ex.InnerException?.Message ?? ex.Message;
                 Console.WriteLine($"Error in GetUsers: {ex.Message}\nInner: {inner}");
                 return BadRequest(new { message = "Failed to parse query or load users", error = ex.Message, innerException = inner });
             }
         }
 
-        // GET: api/admin/jobs?searchTerm=dev&page=1&size=10
         [HttpGet("jobs")]
         public async Task<IActionResult> GetAllJobs([FromQuery] string searchTerm, [FromQuery] int page = 1, [FromQuery] int size = 10)
         {
@@ -126,7 +123,6 @@ namespace SchneeJob.Controllers
             }
             catch (Exception ex)
             {
-                // Log full exception details for debugging
                 var innerMsg = ex.InnerException?.Message ?? ex.Message;
                 Console.WriteLine($"Error approving registration: {ex.Message}\nInner: {innerMsg}");
                 return BadRequest(new { message = ex.Message, innerException = innerMsg });

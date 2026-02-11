@@ -41,5 +41,33 @@ namespace SchneeJob.Controllers
                 return StatusCode(500, new { message = "Error fetching registrations", error = ex.Message });
             }
         }
+        [HttpGet("my-registration")]
+        public async Task<IActionResult> GetMyRegistration()
+        {
+            try
+            {
+                // Get email from claims
+                var email = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
+                if (string.IsNullOrEmpty(email))
+                {
+                    return Unauthorized(new { message = "User email not found in token" });
+                }
+
+                var registrations = await _registrationServices.GetRegistrationsByEmailAsync(email);
+                
+                // Return the most recent one if any
+                var latestRegistration = registrations.FirstOrDefault();
+                
+                if (latestRegistration == null) {
+                    return NotFound(new { message = "No registration found" });
+                }
+
+                return Ok(latestRegistration);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error fetching registration", error = ex.Message });
+            }
+        }
     }
 }

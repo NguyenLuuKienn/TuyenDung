@@ -23,7 +23,6 @@ namespace SchneeJob.Controllers
             public string CoverLetter { get; set; }
         }
 
-        // POST: api/applications 
         [HttpPost]
         [Authorize(Roles = "JobSeeker")]
         public async Task<IActionResult> ApplyForJob([FromBody] ApplyRequest request)
@@ -40,7 +39,6 @@ namespace SchneeJob.Controllers
             }
         }
 
-        // GET: api/applications/my (Job Seeker xem lịch sử)
         [HttpGet("my")]
         [Authorize(Roles = "JobSeeker")]
         public async Task<IActionResult> GetMyApplications()
@@ -54,7 +52,6 @@ namespace SchneeJob.Controllers
             return Ok(applications);
         }
 
-        // GET: api/applications/job/{jobId} (Employer xem ứng viên)
         [HttpGet("job/{jobId}")]
         [Authorize(Roles = "Employer")]
         public async Task<IActionResult> GetApplicationsForJob(Guid jobId)
