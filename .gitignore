@@ -1,0 +1,33 @@
+## =========================
+## Common
+## =========================
+.vs/
+.vscode/
+.idea/
+*.log
+.env
+.env.*
+
+## =========================
+## Backend - ASP.NET Core
+## =========================
+**/bin/
+**/obj/
+appsettings.Development.json
+appsettings.Local.json
+secrets.json
+publish/
+
+## =========================
+## Frontend (React / Vue / Angular)
+## =========================
+**/node_modules/
+**/dist/
+**/build/
+**/.cache/
+
+## =========================
+## OS files
+## =========================
+.DS_Store
+Thumbs.db
