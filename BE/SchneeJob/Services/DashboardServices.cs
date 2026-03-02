@@ -68,7 +68,9 @@ namespace SchneeJob.Services
             var totalApplications = await _context.Applications.LongCountAsync();
 
             var topIndustries = await _context.Jobs
-                .Where(j => j.Company.Industry != null)
+                .Include(j => j.Company)
+                .ThenInclude(c => c.Industry)
+                .Where(j => j.Company != null && j.Company.Industry != null)
                 .GroupBy(j => j.Company.Industry.IndustryName)
                 .Select(g => new TopIndustryStat
                 {
@@ -80,6 +82,8 @@ namespace SchneeJob.Services
                 .ToListAsync();
 
             var topSkills = await _context.JobSkills
+                .Include(js => js.Skill)
+                .Where(js => js.Skill != null)
                 .GroupBy(js => js.Skill.SkillName)
                 .Select(g => new TopSkillStat
                 {
