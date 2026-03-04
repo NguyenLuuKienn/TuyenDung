@@ -231,6 +231,30 @@ const companyService = {
       throw error;
     }
   },
+
+  /**
+   * Submit company registration request
+   */
+  submitRegistration: async (registrationData: {
+    companyName: string;
+    website: string;
+    companyPhoneNumber: string;
+    address: string;
+    industryId: string;
+    logoURL?: string;
+    coverImageURL?: string;
+    contactPersonName: string;
+    contactPersonEmail: string;
+    contactPersonPhoneNumber: string;
+  }) => {
+    try {
+      const res = await api.post('/companyregistrations', registrationData);
+      return res;
+    } catch (error) {
+      console.error('Failed to submit company registration:', error);
+      throw error;
+    }
+  },
 };
 
 export default companyService;

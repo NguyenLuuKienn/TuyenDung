@@ -19,18 +19,36 @@ export interface Application {
   resumeId: string;
   coverLetter: string;
   status: string;
-  appliedAt: string;
-  updatedAt: string;
+  appliedDate: string; // From backend API
+  AppliedDate?: string; // Fallback for older responses
+  updatedAt?: string;
+  user?: {
+    id?: string;
+    userId?: string;
+    fullName?: string;
+    email?: string;
+    avatarURL?: string;
+    avatar?: string;
+    phoneNumber?: string;
+  };
   job?: {
-    id: string;
-    title: string;
+    id?: string;
+    jobId?: string;
+    title?: string;
+    jobTitle?: string; // Main property from backend
+    jobDescription?: string;
     company?: {
-      name: string;
+      id?: string;
+      companyId?: string;
+      name?: string;
+      companyName?: string; // Main property from backend
     };
   };
   resume?: {
     id: string;
-    title: string;
+    resumeId?: string;
+    title?: string;
+    resumeTitle?: string;
   };
   [key: string]: any;
 }
@@ -62,7 +80,29 @@ const applicationService = {
       const data = res.data?.data || res.data || [];
       return { ...res, data };
     } catch (error) {
+      if ((error as any).response?.status === 404) {
+        console.warn('Applications endpoint not found, returning empty array');
+        return { data: [] };
+      }
       console.error('Failed to fetch my applications:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get all applications for employer's jobs (Employer only)
+   */
+  getMyEmployerApplications: async () => {
+    try {
+      const res = await api.get<Application[]>('/applications/employer');
+      const data = res.data?.data || res.data || [];
+      return { ...res, data };
+    } catch (error) {
+      if ((error as any).response?.status === 404) {
+        console.warn('Employer applications endpoint not found, returning empty array');
+        return { data: [] };
+      }
+      console.error('Failed to fetch employer applications:', error);
       throw error;
     }
   },
@@ -76,6 +116,9 @@ const applicationService = {
       const data = res.data?.data || res.data || [];
       return { ...res, data };
     } catch (error) {
+      if ((error as any).response?.status === 404) {
+        return { data: [] };
+      }
       console.error(`Failed to fetch applications for job ${jobId}:`, error);
       throw error;
     }

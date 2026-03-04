@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { Briefcase, Mail, Lock, User, Building2, Phone, Eye, EyeOff, AlertCircle, X } from "lucide-react";
 import { useState } from "react";
 import authService from "@/services/authService";
-import { extractRole } from "@/utils/roleUtils";
+import Swal from "sweetalert2";
 
 export function Register() {
   const navigate = useNavigate();
@@ -86,40 +86,63 @@ export function Register() {
       }
 
       // Check if registration was successful
-      if (response.data.success) {
-        // If API auto-logs in, store credentials
-        if (response.data.token && response.data.userInfo) {
-          const extractedRole = extractRole(response.data.userInfo);
-          const user = {
-            id: response.data.userInfo?.userID || response.data.userInfo?.id,
-            email: response.data.userInfo?.email || email,
-            name: response.data.userInfo?.name || fullName,
-            fullName: response.data.userInfo?.name || fullName,
-            avatar: response.data.userInfo?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=random`,
-            role: extractedRole,
-          };
-          localStorage.setItem("token", response.data.token);
-          localStorage.setItem("user", JSON.stringify(user));
-          
-          // Dispatch custom event for Navbar to update immediately
-          window.dispatchEvent(new CustomEvent('authChange', { detail: { user, token: response.data.token } }));
-          
-          // Auto-login on success
-          navigate("/");
-        } else {
-          // Redirect to login if not auto-logged in
-          navigate("/login?success=true");
-        }
+      // API returns user data directly on success
+      if (response.data && (response.data.email || response.data.userId || response.data.companyId)) {
+        // Generate a temporary token if not provided by API
+        const token = response.data.token || btoa(JSON.stringify({ email: email.trim(), timestamp: Date.now() }));
+        
+        // Build user object from response
+        const userData = response.data;
+        const user = {
+          id: userData.userId || userData.id,
+          email: userData.email || email,
+          name: userData.fullName || userData.companyName || fullName,
+          fullName: userData.fullName || userData.companyName || fullName,
+          avatar: userData.avatarURL || userData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=random`,
+          role: role === "JobSeeker" ? "JobSeeker" : "Employer",
+        };
+        
+        // Store in localStorage
+        localStorage.setItem("token", token);
+        localStorage.setItem("user", JSON.stringify(user));
+        
+        // Dispatch custom event for Navbar to update immediately
+        window.dispatchEvent(new CustomEvent('authChange', { detail: { user, token } }));
+        
+        // Show success popup
+        await Swal.fire({
+          icon: 'success',
+          title: 'Đăng ký thành công!',
+          text: 'Chúc mừng bạn đã tạo tài khoản. Bây giờ vui lòng đăng nhập.',
+          confirmButtonText: 'Đến trang đăng nhập',
+          confirmButtonColor: '#3B82F6',
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+        });
+        
+        // Redirect to login page
+        navigate("/login?email=" + encodeURIComponent(email));
       } else {
-        throw new Error(response.data.message || "Đăng ký thất bại");
+        throw new Error(response.data?.message || "Đăng ký thất bại");
       }
     } catch (err: any) {
       console.error("Registration error:", err);
-      const errorMessage = 
+      let errorMessage = 
         err.response?.data?.message || 
         err.response?.data?.error || 
         err.message ||
         "Đăng ký thất bại. Vui lòng thử lại";
+      
+      // Translate error messages
+      const errorText = errorMessage.toLowerCase();
+      if (errorText.includes("already exists") || errorText.includes("already registered")) {
+        errorMessage = "Email này đã được đăng ký. Vui lòng sử dụng email khác.";
+      } else if (errorText.includes("invalid email")) {
+        errorMessage = "Định dạng email không hợp lệ.";
+      } else if (errorText.includes("password")) {
+        errorMessage = "Mật khẩu phải có ít nhất 6 ký tự.";
+      }
+      
       setError(errorMessage);
       setIsSubmitting(false);
     }

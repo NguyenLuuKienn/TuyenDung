@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
-import { MapPin, Globe, Users, Building2, Star, Heart, MessageCircle, Sparkles, ChevronLeft, Loader } from "lucide-react";
+import { MapPin, Globe, Users, Building2, Star, Heart, MessageCircle, Sparkles, ChevronLeft, Loader, Briefcase } from "lucide-react";
 import { companyService, jobService, postService } from "@/services";
 import type { Company, Job, Post } from "@/services";
 
@@ -93,12 +93,12 @@ export function CompanyDetails() {
         <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-gray-100 mb-8">
           <div className="flex flex-col md:flex-row gap-6 items-start md:items-end justify-between">
             <div className="flex flex-col md:flex-row gap-6 items-start md:items-end">
-              <Avatar src={company.logo} alt={company.name} className="h-32 w-32 rounded-3xl border-4 border-white shadow-lg bg-white" />
+              <Avatar src={company.logo || company.logoURL || `https://picsum.photos/seed/${company.id || company.companyId}/200/200`} alt={company.name || 'Company'} className="h-32 w-32 rounded-3xl border-4 border-white shadow-lg bg-white" />
               <div className="pb-2">
-                <h1 className="text-3xl md:text-4xl font-bold font-display text-gray-900 mb-2">{company.name}</h1>
+                <h1 className="text-3xl md:text-4xl font-bold font-display text-gray-900 mb-2">{company.name || company.companyName || 'Company Name'}</h1>
                 <div className="flex flex-wrap items-center gap-4 text-gray-600 font-medium">
                   <span className="flex items-center gap-1.5"><Building2 className="h-4 w-4 text-gray-400" /> {getIndustryName(company.industry)}</span>
-                  <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-gray-400" /> {company.location || "Tương lượng"}</span>
+                  <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-gray-400" /> {company.address || company.city || "Location"}</span>
                   {company.rating && (
                     <span className="flex items-center gap-1.5 text-amber-500 bg-amber-50 px-2 py-0.5 rounded-md">
                       <Star className="h-4 w-4 fill-current" /> {company.rating}
@@ -119,7 +119,12 @@ export function CompanyDetails() {
             <Card className="border-none shadow-sm">
               <CardContent className="p-8">
                 <h2 className="text-2xl font-bold font-display text-gray-900 mb-4">Về Chúng Tôi</h2>
-                <p className="text-gray-600 leading-relaxed">{company.description}</p>
+                <p className="text-gray-600 leading-relaxed line-clamp-4">
+                  {company.description || company.companyDescription || 'Chưa cập nhật thông tin về công ty'}
+                </p>
+                {(company.description || company.companyDescription) && company.description?.length > 200 && (
+                  <button className="text-brand font-semibold mt-3 hover:underline">Xem Thêm</button>
+                )}
               </CardContent>
             </Card>
 
@@ -161,26 +166,38 @@ export function CompanyDetails() {
               </h2>
               {jobs.length > 0 ? (
                 <div className="space-y-4">
-                  {jobs.map((job) => (
-                    <Card key={job.id} className="group hover:border-brand/30 hover:shadow-md transition-all duration-300">
-                      <CardContent className="p-6">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                          <div>
-                            <Link to={`/jobs/${job.id}`} className="text-lg font-bold font-display text-gray-900 group-hover:text-brand transition-colors">
-                              {job.title}
-                            </Link>
-                            <div className="mt-2 flex items-center gap-3 text-sm text-gray-600 font-medium">
-                              <span><MapPin className="h-4 w-4 text-gray-400 inline mr-1" />{job.location}</span>
-                              <span>{job.employmentType}</span>
+                  {jobs.map((job) => {
+                    const jobTitle = job.jobTitle || job.title || 'Job Title';
+                    const jobLocation = job.location || 'Location';
+                    const jobType = job.employmentType || 'N/A';
+                    const jobId = job.jobId || job.id;
+                    
+                    return (
+                      <Card key={jobId} className="group hover:border-brand/30 hover:shadow-md transition-all duration-300">
+                        <CardContent className="p-6">
+                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <Link to={`/jobs/${jobId}`} className="text-lg font-bold font-display text-gray-900 group-hover:text-brand transition-colors line-clamp-2">
+                                {jobTitle}
+                              </Link>
+                              <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-gray-600 font-medium">
+                                <span><MapPin className="h-4 w-4 text-gray-400 inline mr-1" />{jobLocation}</span>
+                                <span className="px-2 py-1 bg-gray-100 rounded-md">{jobType}</span>
+                                {job.salaryMin && job.salaryMax && (
+                                  <span className="text-brand font-semibold">
+                                    ${job.salaryMin?.toLocaleString()} - ${job.salaryMax?.toLocaleString()}
+                                  </span>
+                                )}
+                              </div>
                             </div>
+                            <Link to={`/jobs/${jobId}`} className="shrink-0">
+                              <Button className="rounded-full cursor-pointer">Chi Tiết</Button>
+                            </Link>
                           </div>
-                          <Link to={`/jobs/${job.id}`}>
-                            <Button className="rounded-full cursor-pointer">Chi Tiết</Button>
-                          </Link>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               ) : (
                 <Card className="border-none shadow-sm bg-gray-50">
@@ -202,26 +219,54 @@ export function CompanyDetails() {
                     <div>
                       <p className="text-xs text-gray-500 font-bold mb-1">Website</p>
                       {company.website && typeof company.website === 'string' && (
-                        <a href={`https://${company.website}`} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline text-sm">
+                        <a href={`https://${company.website}`} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline text-sm break-all">
                           {company.website}
                         </a>
                       )}
                     </div>
                   </div>
+                  
+                  <div className="flex items-start gap-3">
+                    <MapPin className="h-5 w-5 text-gray-400 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-gray-500 font-bold mb-1">Địa Chỉ</p>
+                      <p>{company.address || (company as any)?.address || 'Chưa cập nhật'}</p>
+                    </div>
+                  </div>
+                  
                   <div className="flex items-start gap-3">
                     <Users className="h-5 w-5 text-gray-400 mt-0.5" />
                     <div>
                       <p className="text-xs text-gray-500 font-bold mb-1">Quy Mô</p>
-                      <p>{company.size || 'N/A'}</p>
+                      <p>{company.size || (company as any)?.companySize || 'N/A'}</p>
                     </div>
                   </div>
+
                   <div className="flex items-start gap-3">
-                    <Building2 className="h-5 w-5 text-gray-400 mt-0.5" />
+                    <Briefcase className="h-5 w-5 text-gray-400 mt-0.5" />
                     <div>
-                      <p className="text-xs text-gray-500 font-bold mb-1">Ngành</p>
+                      <p className="text-xs text-gray-500 font-bold mb-1">Ngành Nghề</p>
                       <p>{getIndustryName(company.industry)}</p>
                     </div>
                   </div>
+
+                  <div className="flex items-start gap-3">
+                    <Building2 className="h-5 w-5 text-gray-400 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-gray-500 font-bold mb-1">Email</p>
+                      <p className="break-all">{company.email || (company as any)?.companyEmail || 'Chưa cập nhật'}</p>
+                    </div>
+                  </div>
+
+                  {(company as any)?.phone && (
+                    <div className="flex items-start gap-3">
+                      <MessageCircle className="h-5 w-5 text-gray-400 mt-0.5" />
+                      <div>
+                        <p className="text-xs text-gray-500 font-bold mb-1">Điện Thoại</p>
+                        <p>{(company as any)?.phone}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

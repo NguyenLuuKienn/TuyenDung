@@ -31,13 +31,19 @@ export interface NotificationCreateRequest {
 
 const notificationService = {
   /**
-   * Get my notifications
+   * Get my notifications (unread by default)
    */
   getMyNotifications: async (isRead?: boolean) => {
     try {
-      const params = isRead !== undefined ? { isRead } : {};
-      const res = await api.get<Notification[]>('/notifications', { params });
-      const data = res.data?.data || res.data || [];
+      // If isRead is false/undefined, get unread notifications
+      if (isRead === false || isRead === undefined) {
+        const res = await api.get<Notification[]>('/notifications/unread');
+        const data = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+        return { ...res, data };
+      }
+      // For future use if getting all notifications
+      const res = await api.get<Notification[]>('/notifications');
+      const data = Array.isArray(res.data) ? res.data : (res.data?.data || []);
       return { ...res, data };
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
@@ -50,8 +56,10 @@ const notificationService = {
    */
   getUnreadCount: async () => {
     try {
-      const res = await api.get<number>('/notifications/unread/count');
-      return res;
+      // Get unread notifications and return the count
+      const res = await api.get<Notification[]>('/notifications/unread');
+      const data = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+      return { data: (data || []).length };
     } catch (error) {
       return { data: 0 };
     }
@@ -62,7 +70,7 @@ const notificationService = {
    */
   markAsRead: async (notificationId: string) => {
     try {
-      const res = await api.put(`/notifications/${notificationId}/read`);
+      const res = await api.patch(`/notifications/${notificationId}/read`);
       return res;
     } catch (error) {
       console.error(`Failed to mark notification as read:`, error);

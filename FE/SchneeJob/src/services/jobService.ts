@@ -201,6 +201,64 @@ const jobService = {
   },
 
   /**
+   * Delete job (alias for delete)
+   */
+  deleteJob: async (jobId: string) => {
+    try {
+      const res = await api.delete(`/job/${jobId}`);
+      return res;
+    } catch (error) {
+      console.error(`Failed to delete job ${jobId}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get my jobs (Employer only)
+   */
+  getMyJobs: async () => {
+    try {
+      console.log('[jobService] Fetching my jobs from /job/my');
+      const res = await api.get<Job[]>('/job/my');
+      console.log('[jobService] Response:', res);
+      const data = res.data?.data || res.data || [];
+      const mapped = Array.isArray(data) ? data.map(mapJob).filter(Boolean) : [];
+      return { ...res, data: mapped };
+    } catch (error: any) {
+      console.error('[jobService] Error in getMyJobs:', error);
+      console.error('[jobService] Full error response:', error.response?.data);
+      
+      // Log validation errors specifically
+      if (error.response?.data?.errors) {
+        console.error('[jobService] Validation errors:', JSON.stringify(error.response.data.errors, null, 2));
+      }
+      
+      const err = error as { response?: { status?: number } };
+      if (err.response?.status === 404) {
+        console.log('[jobService] 404 received, returning empty array');
+        return { data: [] };
+      }
+      console.error('Failed to fetch my jobs:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Test backend connectivity
+   */
+  testBackend: async () => {
+    try {
+      console.log('[jobService] Testing backend health endpoint');
+      const res = await api.get('/job/health');
+      console.log('[jobService] Health check response:', res);
+      return res;
+    } catch (error) {
+      console.error('[jobService] Health check failed:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Search jobs
    */
   search: async (query: string, filters?: Record<string, any>) => {

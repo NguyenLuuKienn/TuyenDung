@@ -16,7 +16,6 @@ namespace SchneeJob.Models
         public string LogoURL { get; set; }
         public string CoverImageURL { get; set; }
 
-        // Contact Person Info (người sẽ nhận tài khoản root)
         [Required][StringLength(100)] public string ContactPersonName { get; set; }
         [Required][EmailAddress] public string ContactPersonEmail { get; set; }
         [Phone] public string ContactPersonPhoneNumber { get; set; }
@@ -25,8 +24,8 @@ namespace SchneeJob.Models
         [Required][StringLength(20)] public string Status { get; set; } = "Pending"; // Pending, Approved, Rejected
 
         public DateTime RequestedAt { get; set; } = DateTime.UtcNow;
-        public Guid? ReviewedByAdminId { get; set; } // Admin nào đã duyệt
+        public Guid? ReviewedByAdminId { get; set; }
         public DateTime? ReviewedAt { get; set; }
-        public string AdminNotes { get; set; }
+        public string? AdminNotes { get; set; }
     }
 }

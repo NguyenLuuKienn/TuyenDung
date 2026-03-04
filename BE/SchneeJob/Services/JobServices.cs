@@ -25,8 +25,86 @@ namespace SchneeJob.Services
             }
             return job;
         }
+
+        public async Task<IEnumerable<Job>> GetEmployerJobsAsync(Guid employerId)
+        {
+            try
+            {
+                // Get all jobs posted by this employer
+                // First try using PostedByUserId, then fallback to CompanyId
+                var jobsByUser = await _context.Jobs
+                    .Where(j => j.PostedByUserId == employerId)
+                    .AsNoTracking()
+                    .ToListAsync();
+                
+                if (jobsByUser.Any())
+                {
+                    return jobsByUser;
+                }
+
+                // Fallback: Get the employer's company ID and fetch jobs by company
+                var employer = await _context.Users
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(u => u.UserId == employerId);
+                
+                if (employer?.CompanyId == null || employer.CompanyId == Guid.Empty)
+                {
+                    return new List<Job>();
+                }
+
+                // Get all jobs for this employer's company
+                return await _context.Jobs
+                    .Where(j => j.CompanyId == employer.CompanyId)
+                    .AsNoTracking()
+                    .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error in GetEmployerJobsAsync: {ex.Message}");
+                return new List<Job>();
+            }
+        }
         public async Task<Job> CreateJobAsync(Job job, Guid postByUserId)
         {
+            // Get the employer's user record to find their company
+            var employer = await _context.Users.FirstOrDefaultAsync(u => u.UserId == postByUserId);
+            if (employer == null)
+            {
+                throw new KeyNotFoundException("Employer not found");
+            }
+
+            // If employer doesn't have a company, create one automatically
+            if (employer.CompanyId == null || employer.CompanyId == Guid.Empty)
+            {
+                // Get the pending registration request if available
+                var registrationRequest = await _context.CompanyRegistrations
+                    .Where(r => r.ContactPersonEmail == employer.Email && (r.Status == "Pending" || r.Status == "Approved"))
+                    .FirstOrDefaultAsync();
+
+                // Create a new company
+                var newCompany = new Company
+                {
+                    CompanyId = Guid.NewGuid(),
+                    CompanyName = registrationRequest?.CompanyName ?? $"{employer.FullName}'s Company",
+                    CompanyEmail = registrationRequest?.ContactPersonEmail ?? employer.Email,
+                    PhoneNumber = registrationRequest?.CompanyPhoneNumber ?? "",
+                    Website = registrationRequest?.Website ?? "",
+                    CompanyDescription = "",
+                    CompanySize = "Chưa xác định",
+                    Address = registrationRequest?.Address ?? "",
+                    City = "",
+                    Country = "",
+                    CreatedAt = DateTime.UtcNow,
+                    IsVerified = registrationRequest != null // Mark as verified if there was a registration request
+                };
+
+                _context.Companies.Add(newCompany);
+                employer.CompanyId = newCompany.CompanyId;
+                _context.Users.Update(employer);
+                await _context.SaveChangesAsync();
+            }
+
+            job.CompanyId = employer.CompanyId.Value;
             job.PostedByUserId = postByUserId;
             job.CreatedAt = DateTime.UtcNow;
             job.UpdatedAt = DateTime.UtcNow;

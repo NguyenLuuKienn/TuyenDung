@@ -29,7 +29,7 @@ const resumeService = {
    */
   getMyResumes: async () => {
     try {
-      const res = await api.get<Resume[]>('/resumes/my');
+      const res = await api.get<Resume[]>('/resumes');
       const data = res.data?.data || res.data || [];
       return { ...res, data };
     } catch (error) {

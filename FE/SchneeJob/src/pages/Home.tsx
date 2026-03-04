@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
-import { jobService, postService } from "@/services";
+import { jobService, postService, companyService } from "@/services";
+import { JobCard } from "@/components/JobCard";
 import type { Job, Post } from "@/services";
+import api from "@/services/api";
 
 export function Home() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -24,14 +26,40 @@ export function Home() {
     const fetchData = async () => {
       try {
         setLoading(true);
+        // Fetch jobs and posts first (required)
         const [jobsResponse, postsResponse] = await Promise.all([
           jobService.getAll(),
           postService.getAll()
         ]);
+        
         const jobsData = Array.isArray(jobsResponse.data) ? jobsResponse.data : (jobsResponse as any)?.data || [];
         const postsData = Array.isArray(postsResponse.data) ? postsResponse.data : (postsResponse as any)?.data || [];
-        setAllJobs(jobsData);
-        setJobs(jobsData);
+        
+        let enrichedJobs = jobsData;
+        
+        // Try to fetch companies for enrichment (optional)
+        try {
+          const companiesResponse = await companyService.getAll();
+          const companiesData = Array.isArray(companiesResponse.data) ? companiesResponse.data : (companiesResponse as any)?.data || [];
+          
+          // Create lookup map for companies
+          const companyMap: { [key: string]: any } = {};
+          companiesData.forEach((company: any) => {
+            companyMap[company.companyId] = company;
+          });
+          
+          // Enrich jobs with company data
+          enrichedJobs = jobsData.map((job: any) => ({
+            ...job,
+            company: companyMap[job.companyId]
+          }));
+        } catch (enrichErr) {
+          console.warn("Error enriching job data, using basic data:", enrichErr);
+          // If enrichment fails, just use the basic job data
+        }
+        
+        setAllJobs(enrichedJobs);
+        setJobs(enrichedJobs);
         setPosts(postsData);
         setError(null);
       } catch (err) {
@@ -165,7 +193,10 @@ export function Home() {
                       </div>
                     </CardHeader>
                     <CardContent className="p-5 pt-0 sm:p-5 sm:pt-0">
-                      <p className="text-gray-700 mb-4 leading-relaxed">{post.content}</p>
+                      <div 
+                        className="text-gray-700 mb-4 leading-relaxed prose prose-sm max-w-none"
+                        dangerouslySetInnerHTML={{ __html: post.content }}
+                      />
                       {(post.image || post.imageUrl) && (
                         <div className="mb-4 overflow-hidden rounded-2xl border border-gray-100">
                           <img src={post.image || post.imageUrl} alt="Post attachment" className="w-full h-auto object-cover max-h-64" />
@@ -278,79 +309,16 @@ export function Home() {
               ) : jobs.length === 0 ? (
                 <p className="text-gray-500 text-center py-8">Không tìm thấy việc làm phù hợp.</p>
               ) : (
-                jobs.map((job) => (
-                  <Card key={job.jobId || job.id} className="group hover:border-brand/30 hover:shadow-md transition-all duration-300">
-                    <CardContent className="p-6">
-                      <div className="flex flex-col sm:flex-row gap-5">
-                        <div className="flex-shrink-0">
-                          <Avatar src={job.company?.logo || "https://picsum.photos/seed/company/100/100"} alt={job.company?.name || "Company"} className="h-16 w-16 rounded-2xl border border-gray-100 shadow-sm" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                            <div>
-                              <Link to={`/jobs/${job.jobId || job.id}`} className="text-xl font-bold font-display text-gray-900 group-hover:text-brand transition-colors">
-                                {job.jobTitle || job.title}
-                              </Link>
-                            <div className="mt-1.5 flex items-center gap-2 text-sm text-gray-600">
-                              <Link to={`/company/${job.companyId}`} className="font-medium hover:text-brand transition-colors">
-                                {typeof job.company === 'string' ? job.company : job.company?.name || 'Company'}
-                              </Link>
-                              <span className="text-gray-300">•</span>
-                              <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5 text-gray-400" /> {job.location || "Tương lượng"}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="icon" className="text-gray-400 hover:text-brand hover:bg-brand/10 rounded-full cursor-pointer">
-                              <Bookmark className="h-5 w-5" />
-                            </Button>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 flex flex-wrap items-center gap-4 text-sm font-medium text-gray-600">
-                          <div className="flex items-center gap-1.5 bg-gray-50 px-3 py-1 rounded-lg border border-gray-100">
-                            <Briefcase className="h-4 w-4 text-brand" />
-                            <span>{job.employmentType || job.type || "Full-time"}</span>
-                          </div>
-                          {job.salaryMin && job.salaryMax && (
-                            <div className="flex items-center gap-1.5 bg-gray-50 px-3 py-1 rounded-lg border border-gray-100">
-                              <DollarSign className="h-4 w-4 text-emerald-500" />
-                              <span>${job.salaryMin} - ${job.salaryMax}</span>
-                            </div>
-                          )}
-                          {job.workMode === 'Remote' && (
-                            <div className="flex items-center gap-1.5 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-100 text-emerald-700">
-                              <span>Làm từ xa</span>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="mt-5 flex items-center justify-between">
-                          <div className="flex flex-wrap gap-2">
-                            {(job.jobSkills || job.skills) && (job.jobSkills || job.skills).slice(0, 3).map((skill: any) => (
-                              <Badge key={typeof skill === 'string' ? skill : skill.name} variant="secondary" className="bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium">
-                                {typeof skill === 'string' ? skill : skill.name}
-                              </Badge>
-                            ))}
-                            {(job.jobSkills || job.skills) && (job.jobSkills || job.skills).length > 3 && (
-                              <Badge variant="secondary" className="bg-white border border-gray-200 text-gray-500 font-medium">
-                                +{(job.jobSkills || job.skills).length - 3}
-                              </Badge>
-                            )}
-                          </div>
-                          <Link to={`/jobs/${job.jobId || job.id}`}>
-                            <Button size="sm" className="rounded-full px-6 cursor-pointer">Ứng Tuyển</Button>
-                          </Link>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                jobs.slice(0, 3).map((job) => (
+                  <JobCard key={job.jobId || job.id} job={job} />
                 ))
               )}
             </div>
             
             <div className="pt-4 flex justify-center">
-              <Button variant="outline" className="rounded-full px-8 cursor-pointer">Xem Tất Cả Việc Làm</Button>
+              <Link to="/jobs">
+                <Button variant="outline" className="rounded-full px-8 cursor-pointer">Xem Tất Cả Việc Làm</Button>
+              </Link>
             </div>
           </div>
         </div>
@@ -443,7 +411,7 @@ export function Home() {
                     <div className="flex items-center gap-1 font-medium text-emerald-600"><DollarSign className="h-4 w-4" /> ${job.salaryMin} - ${job.salaryMax}</div>
                   </div>
                   <div className="flex flex-wrap gap-2 mb-6">
-                    {job.skills.slice(0, 3).map(skill => (
+                    {Array.isArray(job.skills) && job.skills.slice(0, 3).map(skill => (
                       <Badge key={skill} variant="secondary" className="bg-gray-50 text-gray-600 font-medium">
                         {skill}
                       </Badge>

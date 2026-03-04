@@ -1,13 +1,18 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Briefcase, Bell, User, LogOut, Settings, Bookmark, ChevronDown, Calculator, FileText } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Avatar } from "../ui/Avatar";
 import { useState, useRef, useEffect } from "react";
 import { notificationService } from "../../services";
+import companyService from "../../services/companyService";
 import type { Notification } from "../../services";
+import Swal from "sweetalert2";
+import { LoginModal } from "../modals/LoginModal";
+import { RegisterModal } from "../modals/RegisterModal";
 
 export function Navbar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState("JobSeeker");
   const [user, setUser] = useState({ name: "User", avatar: "https://picsum.photos/seed/user1/100/100", email: "user@example.com" });
@@ -17,10 +22,91 @@ export function Navbar() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showToolsMenu, setShowToolsMenu] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
   
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const toolsRef = useRef<HTMLDivElement>(null);
+
+  const handleEmployerClick = async () => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        const userData = JSON.parse(storedUser);
+        
+        // Check employer registration status
+        try {
+          const registrationRes = await companyService.getMyRegistration();
+          const registration = registrationRes.data;
+
+          if (!registration) {
+            // No registration found - go to register-company
+            await Swal.fire({
+              icon: 'info',
+              title: 'Chưa đăng ký công ty',
+              text: 'Vui lòng hoàn tất đăng ký công ty để tiếp tục.',
+              confirmButtonText: 'Đến trang đăng ký',
+              confirmButtonColor: '#3B82F6',
+              allowOutsideClick: false,
+              allowEscapeKey: false,
+            });
+            navigate("/employer/register-company");
+            return;
+          }
+
+          // Check registration status
+          const status = registration.status?.toLowerCase() || "";
+          
+          if (status === "approved") {
+            // Already approved - go to dashboard
+            navigate("/employer/dashboard");
+          } else if (status === "pending" || status === "submitted") {
+            // Registration pending - go to registration list
+            navigate("/employer/registrations");
+          } else {
+            // Any other status (rejected, etc.) - go back to register
+            await Swal.fire({
+              icon: 'warning',
+              title: 'Đơn đăng ký bị từ chối',
+              text: 'Vui lòng gửi đơn đăng ký lại hoặc liên hệ với Admin để biết thêm chi tiết.',
+              confirmButtonText: 'Gửi đơn mới',
+              confirmButtonColor: '#3B82F6',
+            });
+            navigate("/employer/register-company");
+          }
+        } catch (err: any) {
+          console.error("Error checking registration:", err);
+          // If 404, assume no registration
+          if (err.response?.status === 404) {
+            await Swal.fire({
+              icon: 'info',
+              title: 'Chưa đăng ký công ty',
+              text: 'Vui lòng hoàn tất đăng ký công ty để tiếp tục.',
+              confirmButtonText: 'Đến trang đăng ký',
+              confirmButtonColor: '#3B82F6',
+              allowOutsideClick: false,
+              allowEscapeKey: false,
+            });
+            navigate("/employer/register-company");
+          } else {
+            // Other error - show message
+            Swal.fire({
+              icon: 'error',
+              title: 'Lỗi kiểm tra trạng thái',
+              text: 'Không thể kiểm tra trạng thái đăng ký. Vui lòng thử lại sau.',
+              confirmButtonColor: '#3B82F6',
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Error parsing user data:", e);
+        navigate("/employer/register-company");
+      }
+    } else {
+      navigate("/login");
+    }
+  };
 
   const getNextRole = (currentRole: string): string => {
     if (currentRole === "JobSeeker" || currentRole === "Applicant") return "Employer";
@@ -214,7 +300,7 @@ export function Navbar() {
             <Link to="/career-guide" className={`hover:text-brand transition-colors ${location.pathname === '/career-guide' ? 'text-brand font-semibold' : ''}`}>Cẩm Nang Nghề Nghiệp</Link>
 
             {(userRole === "Employer") && (
-              <Link to="/employer/dashboard" className={`hover:text-brand transition-colors ${location.pathname.includes('/employer') ? 'text-brand font-semibold' : ''}`}>Nhà Tuyển Dụng</Link>
+              <button onClick={handleEmployerClick} className={`hover:text-brand transition-colors ${location.pathname.includes('/employer') ? 'text-brand font-semibold' : ''} cursor-pointer`}>Nhà Tuyển Dụng</button>
             )}
             {(userRole === "Admin") && (
               <Link to="/admin/dashboard" className={`hover:text-brand transition-colors ${location.pathname.includes('/admin') ? 'text-brand font-semibold' : ''}`}>Quản Trị Viên</Link>
@@ -326,16 +412,42 @@ export function Navbar() {
             </>
           ) : (
             <>
-              <Link to="/login">
-                <Button variant="ghost" className="font-semibold cursor-pointer">Đăng nhập</Button>
-              </Link>
-              <Link to="/register">
-                <Button className="cursor-pointer">Đăng ký</Button>
-              </Link>
+              <Button 
+                variant="ghost" 
+                className="font-semibold cursor-pointer"
+                onClick={() => setShowLoginModal(true)}
+              >
+                Đăng nhập
+              </Button>
+              <Button 
+                className="cursor-pointer"
+                onClick={() => setShowRegisterModal(true)}
+              >
+                Đăng ký
+              </Button>
             </>
           )}
         </div>
       </div>
-    </nav>
+
+      {/* Login Modal */}
+      <LoginModal 
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onSwitchToRegister={() => {
+          setShowLoginModal(false);
+          setShowRegisterModal(true);
+        }}
+      />
+
+      {/* Register Modal */}
+      <RegisterModal 
+        isOpen={showRegisterModal}
+        onClose={() => setShowRegisterModal(false)}
+        onSwitchToLogin={() => {
+          setShowRegisterModal(false);
+          setShowLoginModal(true);
+        }}
+      />    </nav>
   );
 }

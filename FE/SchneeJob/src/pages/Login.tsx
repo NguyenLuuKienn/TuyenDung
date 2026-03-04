@@ -5,7 +5,9 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { Briefcase, Mail, Lock, Github, Eye, EyeOff, X, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import authService from "@/services/authService";
+import companyService from "@/services/companyService";
 import { extractRole } from "@/utils/roleUtils";
+import Swal from "sweetalert2";
 
 export function Login() {
   const navigate = useNavigate();
@@ -15,7 +17,7 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
 
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (e: React.PointerEvent<HTMLFormElement>) => {
     e.preventDefault();
     
     if (!email.trim() || !password.trim()) {
@@ -30,21 +32,32 @@ export function Login() {
       const response = await authService.login(email, password);
       
       // Check if API returned success
-      if (!response.data.success || !response.data.token) {
-        throw new Error(response.data.message || "Đăng nhập thất bại. Vui lòng thử lại");
+      // Handle both wrapped response and direct user data response
+      const data = response.data;
+      let token = data.token;
+      let userInfo = data.userInfo || data.user || data;
+      
+      // If no token is in the response, generate a temporary one (backend doesn't provide tokens)
+      if (!token) {
+        // Create a temporary token based on response data
+        token = btoa(JSON.stringify({ email, timestamp: Date.now() }));
       }
       
-      const { token, userInfo } = response.data;
+      // Verify we have user data
+      if (!userInfo || !(userInfo.email || userInfo.userId || userInfo.id)) {
+        throw new Error(data.message || "Đăng nhập thất bại. Vui lòng thử lại");
+      }
       
       // Normalize user object from API response
       const extractedRole = extractRole(userInfo);
       const user = {
-        id: userInfo?.userID || userInfo?.id,
+        id: userInfo?.userID || userInfo?.id || userInfo?.userId,
         email: userInfo?.email || email,
         name: userInfo?.name || userInfo?.fullName || "User",
         fullName: userInfo?.name || userInfo?.fullName || "User",
-        avatar: userInfo?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userInfo?.name || "User")}&background=random`,
+        avatar: userInfo?.avatar || userInfo?.avatarURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(userInfo?.name || "User")}&background=random`,
         role: extractedRole,
+        companyId: userInfo?.companyId,
       };
       
       // Store token and user in localStorage
@@ -52,13 +65,54 @@ export function Login() {
       localStorage.setItem("user", JSON.stringify(user));
       
       // Dispatch custom event for Navbar to update immediately
-      window.dispatchEvent(new CustomEvent('authChange', { detail: { user, token } }));
+      globalThis.dispatchEvent(new CustomEvent('authChange', { detail: { user, token } }));
+      
+      // Show success popup
+      await Swal.fire({
+        icon: 'success',
+        title: 'Đăng nhập thành công!',
+        text: `Chào mừng, ${user.fullName}!`,
+        confirmButtonText: 'Tiếp tục',
+        confirmButtonColor: '#3B82F6',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+      });
       
       // Redirect based on user role
       const userRole = user.role || "JobSeeker";
       
       if (userRole === "Employer") {
-        navigate("/employer/dashboard");
+        // Check employer company registration status
+        try {
+          const registrationRes = await companyService.getMyRegistration();
+          const registration = registrationRes.data;
+
+          if (!registration) {
+            // No registration found - go to register-company
+            navigate("/employer/register-company");
+          } else {
+            // Check registration status
+            const status = (registration.status || "").toLowerCase().trim();
+            
+            if (status === "approved") {
+              // Already approved - go to dashboard
+              navigate("/employer/dashboard");
+            } else if (status === "pending" || status === "submitted") {
+              // Registration pending - go to registration list
+              navigate("/employer/registrations");
+            } else if (status === "rejected") {
+              // Rejected - need to resubmit
+              navigate("/employer/register-company");
+            } else {
+              // Unknown status - default to register
+              navigate("/employer/register-company");
+            }
+          }
+        } catch (err: any) {
+          console.error("Error checking registration status:", err);
+          // If error (404 or other), assume no registration - go to register-company
+          navigate("/employer/register-company");
+        }
       } else if (userRole === "Admin") {
         navigate("/admin/dashboard");
       } else {
@@ -66,7 +120,19 @@ export function Login() {
       }
     } catch (err: any) {
       console.error("Login error:", err);
-      const errorMessage = err.response?.data?.message || err.response?.data?.error || err.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại email và mật khẩu.";
+      let errorMessage = "Đăng nhập thất bại. Vui lòng kiểm tra lại email và mật khẩu.";
+      
+      // Translate error messages
+      const errorText = err.response?.data?.message || err.response?.data?.error || err.message || "";
+      
+      if (errorText.includes("Invalid email or password")) {
+        errorMessage = "Email hoặc mật khẩu không chính xác.";
+      } else if (errorText.includes("not found") || errorText.includes("User not found")) {
+        errorMessage = "Email không tồn tại trong hệ thống.";
+      } else if (errorText) {
+        errorMessage = errorText;
+      }
+      
       setError(errorMessage);
       setIsSubmitting(false);
     }

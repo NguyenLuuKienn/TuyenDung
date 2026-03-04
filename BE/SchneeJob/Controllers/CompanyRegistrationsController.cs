@@ -1,12 +1,15 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using SchneeJob.Interfaces;
 using SchneeJob.Models;
+using System.Security.Claims;
 
 namespace SchneeJob.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class CompanyRegistrationsController : ControllerBase
     {
         private readonly ICompanyRegistrationServices _registrationServices;
@@ -14,11 +17,22 @@ namespace SchneeJob.Controllers
         {
             _registrationServices = companyRegistrationServices;
         }
-    [HttpPost]
+        
+        [HttpPost]
         public async Task<IActionResult> SubmitRegistration([FromBody] CompanyRegistration request)
         {
             try
             {
+                // Get user email from claims and set it on the request
+                var email = User.FindFirst(ClaimTypes.Email)?.Value;
+                if (string.IsNullOrEmpty(email))
+                {
+                    return Unauthorized(new { message = "User email not found in token" });
+                }
+                
+                // Associate registration with the authenticated user's email
+                request.ContactPersonEmail = request.ContactPersonEmail ?? email;
+                
                 var submittedRequest = await _registrationServices.SubmitRegistrationAsync(request);
                 return Ok(new { message = "Your registration request has been submitted successfully and is pending review." });
             }

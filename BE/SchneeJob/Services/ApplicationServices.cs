@@ -68,6 +68,51 @@ namespace SchneeJob.Services
                 .OrderByDescending(a => a.AppliedDate)
                 .ToListAsync();
         }
+
+        public async Task<IEnumerable<Application>> GetEmployerApplicationsAsync(Guid employerId)
+        {
+            try
+            {
+                // Get the employer's company ID
+                var employer = await _context.Users.FindAsync(employerId);
+                if (employer == null)
+                {
+                    return new List<Application>();
+                }
+
+                var companyId = employer.CompanyId;
+                if (companyId == null || companyId == Guid.Empty)
+                {
+                    return new List<Application>();
+                }
+
+                // Get all jobs for this employer's company
+                var jobIds = await _context.Jobs
+                    .Where(j => j.CompanyId == companyId)
+                    .Select(j => j.JobId)
+                    .ToListAsync();
+
+                if (jobIds.Count == 0)
+                {
+                    return new List<Application>();
+                }
+
+                // Get all applications for those jobs
+                return await _context.Applications
+                    .Where(a => jobIds.Contains(a.JobId))
+                    .Include(a => a.User)
+                    .Include(a => a.Job)
+                    .Include(a => a.Resume)
+                    .OrderByDescending(a => a.AppliedDate)
+                    .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error in GetEmployerApplicationsAsync: {ex.Message}");
+                return new List<Application>();
+            }
+        }
+
         public async Task<Application> UpdateApplicationStatusAsync(Guid applicationId, string newStatus, Guid employerId)
         {
             var application = await _context.Applications

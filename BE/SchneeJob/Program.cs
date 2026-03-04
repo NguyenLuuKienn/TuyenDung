@@ -17,6 +17,9 @@ builder.Services.AddControllers()
         // Prevent JSON serializer errors when entity graphs contain cycles
         opts.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
         opts.JsonSerializerOptions.MaxDepth = 64;
+        // Use camelCase for JSON property names
+        opts.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        opts.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
     });
 
 builder.Services.AddDbContext<SchneeJobDbContext>(options =>

@@ -1,21 +1,38 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
+import Swal from "sweetalert2";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { Users, Briefcase, Building2, AlertTriangle, Activity, Settings, BarChart2, FileText, Search, Bell, ChevronRight, Edit2, Trash2, Eye, FileSignature, LogOut, Home, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, List, Image as ImageIcon, Link as LinkIcon, Loader } from "lucide-react";
+import { Users, Briefcase, Building2, AlertTriangle, Activity, Settings, BarChart2, FileText, Search, Bell, ChevronRight, Edit2, Trash2, Eye, FileSignature, LogOut, Home, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, List, Image as ImageIcon, Link as LinkIcon, Loader, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Avatar } from "@/components/ui/Avatar";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
-import { dashboardService, jobService, companyService } from "@/services";
+import { dashboardService, jobService, companyService, industriesService } from "@/services";
 import api from "@/services/api";
 
 export function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showNotifications, setShowNotifications] = useState(false);
+  const [userInfo, setUserInfo] = useState<any>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    globalThis.location.href = '/';
+  };
+
   useEffect(() => {
+    const user = localStorage.getItem('user');
+    if (user) {
+      try {
+        setUserInfo(JSON.parse(user));
+      } catch (err) {
+        console.error('Failed to parse user info:', err);
+      }
+    }
+
     function handleClickOutside(event: MouseEvent) {
       if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
         setShowNotifications(false);
@@ -94,13 +111,13 @@ export function AdminDashboard() {
             </Button>
           </Link>
           <div className="flex items-center gap-3 px-3 py-2">
-            <Avatar src="https://picsum.photos/seed/admin/100/100" alt="Admin" className="h-10 w-10 rounded-full" />
+            <Avatar src={userInfo?.avatarURL || "https://i.pravatar.cc/150"} alt="Admin" className="h-10 w-10 rounded-full" />
             <div>
-              <p className="text-sm font-bold text-gray-900">Quản Trị Viên</p>
-              <p className="text-xs text-gray-500">admin@schneejob.com</p>
+              <p className="text-sm font-bold text-gray-900 truncate">{userInfo?.fullName || "Người Dùng"}</p>
+              <p className="text-xs text-gray-500 truncate">{userInfo?.email || "admin@schneejob.com"}</p>
             </div>
           </div>
-          <Button variant="outline" className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50 border-red-100 cursor-pointer">
+          <Button variant="outline" className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50 border-red-100 cursor-pointer" onClick={handleLogout}>
             <LogOut className="h-4 w-4 mr-2" />
             Đăng Xuất
           </Button>
@@ -412,15 +429,36 @@ function UsersTab() {
   };
 
   const handleDeleteUser = async (userId: string) => {
-    if (confirm('Bạn có chắc muốn xóa người dùng này?')) {
-      try {
-        await api.delete(`/admin/users/${userId}`);
-        setUsers(users.filter(u => u.id !== userId && u.userId !== userId));
-        alert('Xóa người dùng thành công!');
-      } catch (err) {
-        alert('Không thể xóa người dùng!');
-        console.error('Failed to delete user:', err);
-      }
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: 'Xóa người dùng',
+      text: 'Bạn có chắc muốn xóa người dùng này? Hành động này không thể hoàn tác.',
+      showCancelButton: true,
+      confirmButtonColor: '#EF4444',
+      cancelButtonColor: '#6B7280',
+      confirmButtonText: 'Xóa',
+      cancelButtonText: 'Hủy',
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      await api.delete(`/admin/users/${userId}`);
+      setUsers(users.filter(u => u.id !== userId && u.userId !== userId));
+      await Swal.fire({
+        icon: 'success',
+        title: 'Thành công',
+        text: 'Người dùng đã được xóa',
+        confirmButtonColor: '#3B82F6',
+      });
+    } catch (err) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Lỗi',
+        text: 'Không thể xóa người dùng',
+        confirmButtonColor: '#3B82F6',
+      });
+      console.error('Failed to delete user:', err);
     }
   };
 
@@ -601,7 +639,34 @@ function CompaniesTab() {
       try {
         setLoading(true);
         const res = await companyService.getAll();
-        setCompanies(Array.isArray(res.data) ? res.data : []);
+        let companiesData = Array.isArray(res.data) ? res.data : [];
+        
+        // Fetch industry names for companies that don't have industry data
+        try {
+          const industriesRes = await industriesService.getAllIndustries();
+          const industries = Array.isArray(industriesRes.data) ? industriesRes.data : [];
+          const industryMap = industries.reduce((acc: any, ind: any) => {
+            acc[ind.id || ind.industryId] = ind.name || ind.industryName;
+            return acc;
+          }, {});
+          
+          companiesData = companiesData.map((company: any) => {
+            if (!company.industry && company.industryId && industryMap[company.industryId]) {
+              return {
+                ...company,
+                industry: {
+                  id: company.industryId,
+                  name: industryMap[company.industryId]
+                }
+              };
+            }
+            return company;
+          });
+        } catch (err) {
+          console.error("Failed to fetch industries:", err);
+        }
+        
+        setCompanies(companiesData);
       } catch (err) {
         console.error("Failed to fetch companies:", err);
         setCompanies([]);
@@ -619,19 +684,53 @@ function CompaniesTab() {
   };
 
   const handleDeleteCompany = async (companyId: string) => {
-    if (confirm('Bạn có chắc muốn xóa công ty này?')) {
-      try {
-        await companyService.delete(companyId);
-        setCompanies(companies.filter(c => c.id !== companyId && c.companyId !== companyId));
-        alert('Xóa công ty thành công!');
-      } catch (err) {
-        alert('Không thể xóa công ty!');
-        console.error('Failed to delete company:', err);
-      }
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: 'Xóa công ty',
+      text: 'Bạn có chắc muốn xóa công ty này? Hành động này không thể hoàn tác.',
+      showCancelButton: true,
+      confirmButtonColor: '#EF4444',
+      cancelButtonColor: '#6B7280',
+      confirmButtonText: 'Xóa',
+      cancelButtonText: 'Hủy',
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      await companyService.delete(companyId);
+      setCompanies(companies.filter(c => c.id !== companyId && c.companyId !== companyId));
+      await Swal.fire({
+        icon: 'success',
+        title: 'Thành công',
+        text: 'Công ty đã được xóa',
+        confirmButtonColor: '#3B82F6',
+      });
+    } catch (err) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Lỗi',
+        text: 'Không thể xóa công ty',
+        confirmButtonColor: '#3B82F6',
+      });
+      console.error('Failed to delete company:', err);
     }
   };
 
   const handleVerifyCompany = async (companyId: string) => {
+    const result = await Swal.fire({
+      icon: 'info',
+      title: 'Xác nhận duyệt công ty',
+      text: 'Bạn có chắc muốn duyệt công ty này?',
+      showCancelButton: true,
+      confirmButtonColor: '#10B981',
+      cancelButtonColor: '#6B7280',
+      confirmButtonText: 'Duyệt',
+      cancelButtonText: 'Hủy',
+    });
+
+    if (!result.isConfirmed) return;
+
     try {
       await companyService.verify(companyId, true);
       setCompanies(companies.map(c => 
@@ -642,9 +741,19 @@ function CompaniesTab() {
       setSelectedCompany(selectedCompany && (selectedCompany.id === companyId || selectedCompany.companyId === companyId)
         ? { ...selectedCompany, isVerified: true }
         : selectedCompany);
-      alert('Duyệt công ty thành công!');
+      await Swal.fire({
+        icon: 'success',
+        title: 'Thành công',
+        text: 'Công ty đã được duyệt',
+        confirmButtonColor: '#3B82F6',
+      });
     } catch (err) {
-      alert('Không thể duyệt công ty!');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Lỗi',
+        text: 'Không thể duyệt công ty',
+        confirmButtonColor: '#3B82F6',
+      });
       console.error('Failed to verify company:', err);
     }
   };
@@ -673,25 +782,28 @@ function CompaniesTab() {
               <thead className="text-xs text-gray-500 uppercase bg-gray-50/50 border-b border-gray-100">
                 <tr>
                   <th className="px-6 py-4 font-bold">Công Ty</th>
+                  <th className="px-6 py-4 font-bold">Email</th>
                   <th className="px-6 py-4 font-bold">Ngành Nghề</th>
+                  <th className="px-6 py-4 font-bold">Địa Chỉ</th>
                   <th className="px-6 py-4 font-bold">Trạng Thái</th>
                   <th className="px-6 py-4 font-bold text-right">Hành Động</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {companies.length > 0 ? (
-                  companies.map((company, i) => (
-                    <tr key={company.id || i} className="hover:bg-gray-50/50 transition-colors">
+                  companies.map((company) => (
+                    <tr key={company.id || company.companyId} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <Avatar src={company.logoURL || company.logo || ""} alt={company.companyName || company.name || "Company"} className="h-10 w-10 rounded-xl border border-gray-100" />
                           <div>
                             <p className="font-bold text-gray-900">{company.companyName || company.name}</p>
-                            <p className="text-gray-500 text-xs">{company.companyEmail || company.email}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 font-medium text-gray-700">{company.industry?.name || "N/A"}</td>
+                      <td className="px-6 py-4 text-gray-700 text-xs">{company.companyEmail || company.email || "N/A"}</td>
+                      <td className="px-6 py-4 font-medium text-gray-700">{company.industry?.name || company.industryName || "N/A"}</td>
+                      <td className="px-6 py-4 text-gray-700 text-sm">{company.address || "N/A"}</td>
                       <td className="px-6 py-4">
                         <Badge variant={company.isVerified ? "success" : "secondary"} className="border-none">
                           {company.isVerified ? "Đã duyệt" : "Chờ duyệt"}
@@ -707,7 +819,7 @@ function CompaniesTab() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={4} className="px-6 py-4 text-center text-gray-500">
+                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
                       Không tìm thấy công ty nào.
                     </td>
                   </tr>
@@ -799,10 +911,17 @@ function CompanyRequestsTab() {
     const fetchRequests = async () => {
       try {
         setLoading(true);
-        const res = await api.get('/admin/registrations/pending');
+        // Get all registrations, not just pending
+        const res = await api.get('/companyregistrations');
         setRequests(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
         console.error("Failed to fetch company requests:", err);
+        Swal.fire({
+          icon: 'error',
+          title: 'Lỗi',
+          text: 'Không thể tải danh sách đơn đăng ký',
+          confirmButtonColor: '#3B82F6',
+        });
         setRequests([]);
       } finally {
         setLoading(false);
@@ -818,38 +937,131 @@ function CompanyRequestsTab() {
   };
 
   const handleApprove = async (registrationId: string) => {
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: 'Xác nhận duyệt',
+      text: 'Bạn chắc chắn muốn duyệt đơn đăng ký này?',
+      showCancelButton: true,
+      confirmButtonColor: '#10B981',
+      cancelButtonColor: '#6B7280',
+      confirmButtonText: 'Có, duyệt ngay',
+      cancelButtonText: 'Hủy',
+    });
+
+    if (!result.isConfirmed) return;
+
     try {
       await api.post(`/admin/registrations/${registrationId}/approve`, {});
       setRequests(requests.map(r => 
-        r.id === registrationId || r.companyRegistrationId === registrationId 
+        r.requestId === registrationId || r.id === registrationId || r.companyRegistrationId === registrationId 
           ? { ...r, status: "Approved" } 
           : r
       ));
-      setSelectedRequest(selectedRequest && (selectedRequest.id === registrationId || selectedRequest.companyRegistrationId === registrationId)
+      setSelectedRequest(selectedRequest && (selectedRequest.requestId === registrationId || selectedRequest.id === registrationId || selectedRequest.companyRegistrationId === registrationId)
         ? { ...selectedRequest, status: "Approved" }
         : selectedRequest);
-      alert('Duyệt công ty thành công!');
+      
+      await Swal.fire({
+        icon: 'success',
+        title: 'Thành công',
+        text: 'Đơn đăng ký công ty đã được duyệt thành công',
+        confirmButtonColor: '#3B82F6',
+      });
     } catch (err) {
-      alert('Không thể duyệt công ty!');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Lỗi',
+        text: 'Không thể duyệt đơn đăng ký',
+        confirmButtonColor: '#3B82F6',
+      });
       console.error('Failed to approve:', err);
     }
   };
 
   const handleReject = async (registrationId: string) => {
+    const { value: notes } = await Swal.fire({
+      icon: 'warning',
+      title: 'Từ chối đơn đăng ký',
+      input: 'textarea',
+      inputLabel: 'Lý do từ chối',
+      inputPlaceholder: 'Nhập lý do từ chối (tùy chọn)',
+      showCancelButton: true,
+      confirmButtonColor: '#EF4444',
+      cancelButtonColor: '#6B7280',
+      confirmButtonText: 'Từ chối',
+      cancelButtonText: 'Hủy',
+    });
+
+    if (notes === undefined) return;
+
     try {
-      await api.post(`/admin/registrations/${registrationId}/reject`, { Notes: "" });
+      await api.post(`/admin/registrations/${registrationId}/reject`, { notes: notes || "" });
       setRequests(requests.map(r => 
-        r.id === registrationId || r.companyRegistrationId === registrationId 
+        r.requestId === registrationId || r.id === registrationId || r.companyRegistrationId === registrationId 
           ? { ...r, status: "Rejected" } 
           : r
       ));
-      setSelectedRequest(selectedRequest && (selectedRequest.id === registrationId || selectedRequest.companyRegistrationId === registrationId)
+      setSelectedRequest(selectedRequest && (selectedRequest.requestId === registrationId || selectedRequest.id === registrationId || selectedRequest.companyRegistrationId === registrationId)
         ? { ...selectedRequest, status: "Rejected" }
         : selectedRequest);
-      alert('Từ chối công ty thành công!');
+      
+      await Swal.fire({
+        icon: 'success',
+        title: 'Thành công',
+        text: 'Đơn đăng ký công ty đã bị từ chối',
+        confirmButtonColor: '#3B82F6',
+      });
     } catch (err) {
-      alert('Không thể từ chối công ty!');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Lỗi',
+        text: 'Không thể từ chối đơn đăng ký',
+        confirmButtonColor: '#3B82F6',
+      });
       console.error('Failed to reject:', err);
+    }
+  };
+
+  const handleUndecide = async (registrationId: string) => {
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: 'Hủy quyết định',
+      text: 'Bạn muốn đưa đơn này về trạng thái chờ xét duyệt?',
+      showCancelButton: true,
+      confirmButtonColor: '#F59E0B',
+      cancelButtonColor: '#6B7280',
+      confirmButtonText: 'Có, hủy quyết định',
+      cancelButtonText: 'Hủy',
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      // Assuming there's an endpoint to undo decision, or we'll just update status
+      await api.patch(`/admin/registrations/${registrationId}`, { status: "Submitted" });
+      setRequests(requests.map(r => 
+        r.requestId === registrationId || r.id === registrationId || r.companyRegistrationId === registrationId 
+          ? { ...r, status: "Submitted" } 
+          : r
+      ));
+      setSelectedRequest(selectedRequest && (selectedRequest.requestId === registrationId || selectedRequest.id === registrationId || selectedRequest.companyRegistrationId === registrationId)
+        ? { ...selectedRequest, status: "Submitted" }
+        : selectedRequest);
+      
+      await Swal.fire({
+        icon: 'success',
+        title: 'Thành công',
+        text: 'Đơn đăng ký đã được đưa về trạng thái chờ xét duyệt',
+        confirmButtonColor: '#3B82F6',
+      });
+    } catch (err) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Lỗi',
+        text: 'Không thể hủy quyết định',
+        confirmButtonColor: '#3B82F6',
+      });
+      console.error('Failed to undecide:', err);
     }
   };
 
@@ -876,9 +1088,10 @@ function CompanyRequestsTab() {
             <table className="w-full text-sm text-left">
               <thead className="text-xs text-gray-500 uppercase bg-gray-50/50 border-b border-gray-100">
                 <tr>
-                  <th className="px-6 py-4 font-bold">Mã Đơn</th>
                   <th className="px-6 py-4 font-bold">Tên Công Ty</th>
+                  <th className="px-6 py-4 font-bold">Website</th>
                   <th className="px-6 py-4 font-bold">Người Liên Hệ</th>
+                  <th className="px-6 py-4 font-bold">Email</th>
                   <th className="px-6 py-4 font-bold">Ngày Gửi</th>
                   <th className="px-6 py-4 font-bold">Trạng Thái</th>
                   <th className="px-6 py-4 font-bold text-right">Hành Động</th>
@@ -887,25 +1100,29 @@ function CompanyRequestsTab() {
               <tbody className="divide-y divide-gray-50">
                 {requests.length > 0 ? (
                   requests.map((req) => (
-                    <tr key={req.id || req.companyRegistrationId}>
-                      <td className="px-6 py-4 font-mono text-xs text-gray-500">{req.id || req.companyRegistrationId || "N/A"}</td>
+                    <tr key={req.requestId || req.id || req.companyRegistrationId} className="hover:bg-gray-50/50 transition">
                       <td className="px-6 py-4 font-bold text-gray-900">{req.companyName || req.company || "N/A"}</td>
-                      <td className="px-6 py-4 text-gray-700">{req.contactName || req.contact || "N/A"}</td>
+                      <td className="px-6 py-4 text-gray-700 text-xs">{req.website || "N/A"}</td>
+                      <td className="px-6 py-4 text-gray-700">{req.contactPersonName || req.contactName || req.contact || "N/A"}</td>
+                      <td className="px-6 py-4 text-gray-700 text-xs">{req.contactPersonEmail || req.email || "N/A"}</td>
                       <td className="px-6 py-4 text-gray-500">
-                        {req.createdAt ? new Date(req.createdAt).toLocaleDateString('vi-VN') : req.date || "N/A"}
+                        {req.requestedAt ? new Date(req.requestedAt).toLocaleDateString('vi-VN') : req.createdAt ? new Date(req.createdAt).toLocaleDateString('vi-VN') : req.date || "N/A"}
                       </td>
                       <td className="px-6 py-4">
                         <Badge variant={req.status === "Approved" || req.status === "Đã duyệt" ? "success" : req.status === "Rejected" || req.status === "Từ chối" ? "destructive" : "warning"} className="border-none">
-                          {req.status === "Pending" ? "Chờ duyệt" : req.status === "Approved" ? "Đã duyệt" : req.status === "Rejected" ? "Từ chối" : req.status}
+                          {req.status === "Pending" || req.status === "Submitted" ? "Chờ duyệt" : req.status === "Approved" ? "Đã duyệt" : req.status === "Rejected" ? "Từ chối" : req.status}
                         </Badge>
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {(req.status === "Pending" || !req.status) && (
+                          {(req.status === "Pending" || req.status === "Submitted" || !req.status) && (
                             <>
-                              <Button variant="outline" size="sm" className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 rounded-full cursor-pointer" onClick={() => handleApprove(req.id || req.companyRegistrationId)}>Duyệt</Button>
-                              <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 rounded-full cursor-pointer" onClick={() => handleReject(req.id || req.companyRegistrationId)}>Từ chối</Button>
+                              <Button variant="outline" size="sm" className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 rounded-full cursor-pointer" onClick={() => handleApprove(req.requestId || req.id || req.companyRegistrationId)}>Duyệt</Button>
+                              <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 rounded-full cursor-pointer" onClick={() => handleReject(req.requestId || req.id || req.companyRegistrationId)}>Từ chối</Button>
                             </>
+                          )}
+                          {(req.status === "Approved" || req.status === "Rejected") && (
+                            <Button variant="outline" size="icon" className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 border-amber-200 rounded-full cursor-pointer" title="Hủy quyết định" onClick={() => handleUndecide(req.requestId || req.id || req.companyRegistrationId)}><RotateCcw className="h-4 w-4" /></Button>
                           )}
                           <Button variant="ghost" size="icon" className="text-gray-500 hover:text-brand rounded-full cursor-pointer" onClick={() => handleViewRequest(req)}><Eye className="h-4 w-4" /></Button>
                         </div>
@@ -914,7 +1131,7 @@ function CompanyRequestsTab() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                    <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
                       Không tìm thấy đơn đăng ký nào.
                     </td>
                   </tr>
@@ -928,55 +1145,126 @@ function CompanyRequestsTab() {
       <Modal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
-        title="Chi Tiết Đơn Đăng Ký"
+        title="Chi Tiết Đơn Đăng Ký Công Ty"
         footer={
-          <div className="flex gap-2">
-            {selectedRequest && (selectedRequest.status === "Pending" || !selectedRequest.status) && (
+          <div className="flex gap-2 flex-wrap">
+            {selectedRequest && (selectedRequest.status === "Pending" || selectedRequest.status === "Submitted" || !selectedRequest.status) && (
               <>
-                <Button variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 cursor-pointer" onClick={() => { handleReject(selectedRequest.id || selectedRequest.companyRegistrationId); setIsModalOpen(false); }}>Từ chối</Button>
-                <Button className="bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer" onClick={() => { handleApprove(selectedRequest.id || selectedRequest.companyRegistrationId); setIsModalOpen(false); }}>Phê duyệt</Button>
+                <Button variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 cursor-pointer" onClick={() => { handleReject(selectedRequest.requestId || selectedRequest.id || selectedRequest.companyRegistrationId); setIsModalOpen(false); }}>Từ chối</Button>
+                <Button className="bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer" onClick={() => { handleApprove(selectedRequest.requestId || selectedRequest.id || selectedRequest.companyRegistrationId); setIsModalOpen(false); }}>Phê duyệt</Button>
               </>
+            )}
+            {selectedRequest && (selectedRequest.status === "Approved" || selectedRequest.status === "Rejected") && (
+              <Button variant="outline" className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 border-amber-200 cursor-pointer" onClick={() => { handleUndecide(selectedRequest.requestId || selectedRequest.id || selectedRequest.companyRegistrationId); setIsModalOpen(false); }}>Hủy quyết định</Button>
             )}
             <Button variant="outline" onClick={() => setIsModalOpen(false)} className="cursor-pointer">Đóng</Button>
           </div>
         }
       >
         {selectedRequest && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xl font-bold text-gray-900">{selectedRequest.companyName || selectedRequest.company || "N/A"}</h3>
+          <div className="space-y-6 max-h-[70vh] overflow-y-auto">
+            {/* Header with status */}
+            <div className="flex items-center justify-between pb-4 border-b">
+              <h3 className="text-2xl font-bold text-gray-900">{selectedRequest.companyName || selectedRequest.company || "N/A"}</h3>
               <Badge variant={selectedRequest.status === "Approved" || selectedRequest.status === "Đã duyệt" ? "success" : selectedRequest.status === "Rejected" || selectedRequest.status === "Từ chối" ? "destructive" : "warning"} className="border-none">
-                {selectedRequest.status === "Pending" ? "Chờ duyệt" : selectedRequest.status === "Approved" ? "Đã duyệt" : selectedRequest.status === "Rejected" ? "Từ chối" : selectedRequest.status}
+                {selectedRequest.status === "Pending" || selectedRequest.status === "Submitted" ? "Chờ duyệt" : selectedRequest.status === "Approved" ? "Đã duyệt" : selectedRequest.status === "Rejected" ? "Từ chối" : selectedRequest.status}
               </Badge>
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 bg-gray-50 rounded-xl">
-                <p className="text-xs text-gray-500 uppercase font-bold mb-1">Mã Đơn</p>
-                <p className="font-medium text-gray-900">{selectedRequest.id || selectedRequest.companyRegistrationId || "N/A"}</p>
+            {/* Application Info */}
+            <div>
+              <h4 className="font-bold text-gray-900 mb-3">Thông tin đơn đăng ký</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500 font-semibold mb-1">Mã Đơn</p>
+                  <p className="font-mono text-sm text-gray-900">{selectedRequest.requestId || selectedRequest.id || "N/A"}</p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500 font-semibold mb-1">Ngày Gửi</p>
+                  <p className="text-sm text-gray-900">{selectedRequest.requestedAt ? new Date(selectedRequest.requestedAt).toLocaleDateString('vi-VN') : selectedRequest.createdAt ? new Date(selectedRequest.createdAt).toLocaleDateString('vi-VN') : "N/A"}</p>
+                </div>
               </div>
-              <div className="p-4 bg-gray-50 rounded-xl">
-                <p className="text-xs text-gray-500 uppercase font-bold mb-1">Ngày Gửi</p>
-                <p className="font-medium text-gray-900">
-                  {selectedRequest.createdAt ? new Date(selectedRequest.createdAt).toLocaleDateString('vi-VN') : selectedRequest.date || "N/A"}
+            </div>
+
+            {/* Company Details */}
+            <div>
+              <h4 className="font-bold text-gray-900 mb-3">Thông tin công ty</h4>
+              <div className="space-y-3">
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500 font-semibold mb-1">Tên Công Ty</p>
+                  <p className="text-sm text-gray-900">{selectedRequest.companyName || "N/A"}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <p className="text-xs text-gray-500 font-semibold mb-1">Website</p>
+                    <p className="text-sm text-gray-900">{selectedRequest.website || "N/A"}</p>
+                  </div>
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <p className="text-xs text-gray-500 font-semibold mb-1">Số Điện Thoại</p>
+                    <p className="text-sm text-gray-900">{selectedRequest.companyPhoneNumber || selectedRequest.phone || "N/A"}</p>
+                  </div>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500 font-semibold mb-1">Địa Chỉ</p>
+                  <p className="text-sm text-gray-900">{selectedRequest.address || "N/A"}</p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500 font-semibold mb-1">Ngành Nghề</p>
+                  <p className="text-sm text-gray-900">{selectedRequest.industryName || selectedRequest.industry || "N/A"}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Contact Person */}
+            <div>
+              <h4 className="font-bold text-gray-900 mb-3">Thông tin người liên hệ</h4>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <p className="text-xs text-gray-500 font-semibold mb-1">Tên</p>
+                    <p className="text-sm text-gray-900">{selectedRequest.contactPersonName || selectedRequest.contactName || "N/A"}</p>
+                  </div>
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <p className="text-xs text-gray-500 font-semibold mb-1">Email</p>
+                    <p className="text-sm text-gray-900">{selectedRequest.contactPersonEmail || selectedRequest.email || "N/A"}</p>
+                  </div>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500 font-semibold mb-1">Số Điện Thoại</p>
+                  <p className="text-sm text-gray-900">{selectedRequest.contactPersonPhoneNumber || selectedRequest.contactPhone || "N/A"}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Images */}
+            {(selectedRequest.logoURL || selectedRequest.coverImageURL) && (
+              <div>
+                <h4 className="font-bold text-gray-900 mb-3">Hình ảnh</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  {selectedRequest.logoURL && (
+                    <div>
+                      <p className="text-xs text-gray-500 font-semibold mb-2">Logo</p>
+                      <img src={selectedRequest.logoURL} alt="logo" className="w-full h-32 object-cover rounded-lg border border-gray-200" />
+                    </div>
+                  )}
+                  {selectedRequest.coverImageURL && (
+                    <div>
+                      <p className="text-xs text-gray-500 font-semibold mb-2">Ảnh Bìa</p>
+                      <img src={selectedRequest.coverImageURL} alt="cover" className="w-full h-32 object-cover rounded-lg border border-gray-200" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Admin Notes */}
+            {selectedRequest.adminNotes && (
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  <strong>Ghi chú Admin:</strong> {selectedRequest.adminNotes}
                 </p>
               </div>
-              <div className="p-4 bg-gray-50 rounded-xl">
-                <p className="text-xs text-gray-500 uppercase font-bold mb-1">Người Liên Hệ</p>
-                <p className="font-medium text-gray-900">{selectedRequest.contactName || selectedRequest.contact || "N/A"}</p>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-xl">
-                <p className="text-xs text-gray-500 uppercase font-bold mb-1">Email Liên Hệ</p>
-                <p className="font-medium text-gray-900">{selectedRequest.email || selectedRequest.companyEmail || "N/A"}</p>
-              </div>
-            </div>
-            
-            <div>
-              <h4 className="font-bold text-gray-900 mb-2">Mô tả công ty</h4>
-              <p className="text-gray-600 text-sm leading-relaxed">
-                {selectedRequest.description || selectedRequest.companyDescription || "Chưa có mô tả"}
-              </p>
-            </div>
+            )}
           </div>
         )}
       </Modal>
@@ -994,10 +1282,47 @@ function JobsTab() {
     const fetchJobs = async () => {
       try {
         setLoading(true);
-        const res = await jobService.getAll();
-        setJobs(Array.isArray(res.data) ? res.data : []);
+        
+        // Fetch all needed data in parallel
+        const [jobsRes, companiesRes, jobLevelsRes] = await Promise.all([
+          jobService.getAll().catch(err => {
+            console.error("Failed to fetch jobs:", err);
+            return { data: [] };
+          }),
+          companyService.getAll().catch(err => {
+            console.error("Failed to fetch companies:", err);
+            return { data: [] };
+          }),
+          api.get('/joblevel').catch(err => {
+            console.error("Failed to fetch job levels:", err);
+            return { data: [] };
+          })
+        ]);
+        
+        // Create maps for quick lookup
+        const companies = Array.isArray(companiesRes.data) ? companiesRes.data : [];
+        const companyMap = companies.reduce((acc: any, company: any) => {
+          acc[company.companyId || company.id] = company;
+          return acc;
+        }, {});
+        
+        const jobLevels = Array.isArray(jobLevelsRes.data) ? jobLevelsRes.data : [];
+        const jobLevelMap = jobLevels.reduce((acc: any, level: any) => {
+          acc[level.id || level.jobLevelId] = level.name || level.jobLevelName || level;
+          return acc;
+        }, {});
+        
+        // Enrich job data with company and job level information
+        let jobsData = Array.isArray(jobsRes.data) ? jobsRes.data : [];
+        jobsData = jobsData.map((job) => ({
+          ...job,
+          company: job.company || companyMap[job.companyId],
+          jobLevelName: jobLevelMap[job.jobLevel] || job.jobLevel
+        }));
+        
+        setJobs(jobsData);
       } catch (err) {
-        console.error("Failed to fetch jobs:", err);
+        console.error("Failed to process jobs:", err);
         setJobs([]);
       } finally {
         setLoading(false);
@@ -1010,6 +1335,40 @@ function JobsTab() {
   const handleViewJob = (job: any) => {
     setSelectedJob(job);
     setIsModalOpen(true);
+  };
+
+  const handleDeleteJob = async (jobId: string) => {
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: 'Xóa việc làm',
+      text: 'Bạn có chắc muốn xóa việc làm này? Hành động này không thể hoàn tác.',
+      showCancelButton: true,
+      confirmButtonColor: '#EF4444',
+      cancelButtonColor: '#6B7280',
+      confirmButtonText: 'Xóa',
+      cancelButtonText: 'Hủy',
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      await jobService.delete(jobId);
+      setJobs(jobs.filter(j => j.jobId !== jobId && j.id !== jobId));
+      await Swal.fire({
+        icon: 'success',
+        title: 'Thành công',
+        text: 'Việc làm đã được xóa',
+        confirmButtonColor: '#3B82F6',
+      });
+    } catch (err) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Lỗi',
+        text: 'Không thể xóa việc làm',
+        confirmButtonColor: '#3B82F6',
+      });
+      console.error('Failed to delete job:', err);
+    }
   };
 
   if (loading) {
@@ -1037,19 +1396,25 @@ function JobsTab() {
                 <tr>
                   <th className="px-6 py-4 font-bold">Việc Làm</th>
                   <th className="px-6 py-4 font-bold">Công Ty</th>
+                  <th className="px-6 py-4 font-bold">Vị Trí</th>
                   <th className="px-6 py-4 font-bold">Ngày Đăng</th>
+                  <th className="px-6 py-4 font-bold">Mức Lương</th>
                   <th className="px-6 py-4 font-bold">Trạng Thái</th>
                   <th className="px-6 py-4 font-bold text-right">Hành Động</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {jobs.length > 0 ? (
-                  jobs.map((job, i) => (
-                    <tr key={job.jobId || i} className="hover:bg-gray-50/50 transition-colors">
+                  jobs.map((job) => (
+                    <tr key={job.jobId || job.id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-6 py-4 font-bold text-gray-900">{job.jobTitle || job.title}</td>
-                      <td className="px-6 py-4 font-medium text-gray-700">{job.company?.name || "N/A"}</td>
+                      <td className="px-6 py-4 font-medium text-gray-700">{job.company?.companyName || job.company?.name || "N/A"}</td>
+                      <td className="px-6 py-4 text-gray-700 text-sm">{job.location || "N/A"}</td>
                       <td className="px-6 py-4 text-gray-500">
                         {job.createdAt ? new Date(job.createdAt).toLocaleDateString('vi-VN') : "N/A"}
+                      </td>
+                      <td className="px-6 py-4 text-gray-700 font-medium">
+                        ${job.salaryMin || 0} - ${job.salaryMax || 0}
                       </td>
                       <td className="px-6 py-4">
                         <Badge variant={job.status === "Open" ? "success" : "destructive"} className="border-none">
@@ -1059,14 +1424,14 @@ function JobsTab() {
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <Button variant="ghost" size="icon" className="text-gray-500 hover:text-brand rounded-full cursor-pointer" onClick={() => handleViewJob(job)}><Eye className="h-4 w-4" /></Button>
-                          <Button variant="ghost" size="icon" className="text-gray-500 hover:text-red-600 rounded-full cursor-pointer"><Trash2 className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="text-gray-500 hover:text-red-600 rounded-full cursor-pointer" onClick={() => handleDeleteJob(job.jobId || job.id)}><Trash2 className="h-4 w-4" /></Button>
                         </div>
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                    <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
                       Không tìm thấy việc làm nào.
                     </td>
                   </tr>
@@ -1082,17 +1447,18 @@ function JobsTab() {
         onClose={() => setIsModalOpen(false)} 
         title="Chi Tiết Việc Làm"
         footer={
-          <>
+          <div className="flex gap-2">
+            <Button variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 cursor-pointer" onClick={() => { handleDeleteJob(selectedJob?.jobId || selectedJob?.id); setIsModalOpen(false); }}>Xóa</Button>
             <Button onClick={() => setIsModalOpen(false)} className="cursor-pointer">Đóng</Button>
-          </>
+          </div>
         }
       >
         {selectedJob && (
-          <div className="space-y-6">
-            <div className="flex items-start justify-between">
+          <div className="space-y-6 max-h-[70vh] overflow-y-auto">
+            <div className="flex items-start justify-between pb-4 border-b">
               <div>
-                <h3 className="text-xl font-bold text-gray-900">{selectedJob.jobTitle || selectedJob.title}</h3>
-                <p className="text-brand font-medium mt-1">{selectedJob.company?.name || "N/A"}</p>
+                <h3 className="text-2xl font-bold text-gray-900">{selectedJob.jobTitle || selectedJob.title}</h3>
+                <p className="text-brand font-medium mt-1">{selectedJob.company?.companyName || selectedJob.company?.name || "N/A"}</p>
               </div>
               <Badge variant={selectedJob.status === "Open" ? "success" : "destructive"} className="border-none">
                 {selectedJob.status === "Open" ? "Đang hiển thị" : "Đóng"}
@@ -1101,23 +1467,64 @@ function JobsTab() {
             
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 bg-gray-50 rounded-xl">
+                <p className="text-xs text-gray-500 uppercase font-bold mb-1">Ngành Nghề / Loại Việc Làm</p>
+                <p className="font-medium text-gray-900">{selectedJob.jobLevelName || selectedJob.jobLevel || "N/A"}</p>
+              </div>
+              <div className="p-4 bg-gray-50 rounded-xl">
+                <p className="text-xs text-gray-500 uppercase font-bold mb-1">Loại Hình Tuyển Dụng</p>
+                <p className="font-medium text-gray-900">{selectedJob.employmentType || "N/A"}</p>
+              </div>
+              <div className="p-4 bg-gray-50 rounded-xl">
+                <p className="text-xs text-gray-500 uppercase font-bold mb-1">Địa Điểm</p>
+                <p className="font-medium text-gray-900">{selectedJob.location || "N/A"}</p>
+              </div>
+              <div className="p-4 bg-gray-50 rounded-xl">
+                <p className="text-xs text-gray-500 uppercase font-bold mb-1">Hạn Chót Ứng Tuyển</p>
+                <p className="font-medium text-gray-900">
+                  {selectedJob.deadline ? new Date(selectedJob.deadline).toLocaleDateString('vi-VN') : "Không có"}
+                </p>
+              </div>
+              <div className="p-4 bg-gray-50 rounded-xl col-span-2">
+                <p className="text-xs text-gray-500 uppercase font-bold mb-1">Mức Lương</p>
+                <p className="font-medium text-gray-900 text-lg">
+                  ${selectedJob.salaryMin || 0} - ${selectedJob.salaryMax || 0} ({selectedJob.salaryType || "Per Year"})
+                </p>
+              </div>
+            </div>
+            
+            <div>
+              <h4 className="font-bold text-gray-900 mb-2">Mô Tả Công Việc</h4>
+              <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap">
+                {selectedJob.jobDescription || "Chưa có mô tả"}
+              </p>
+            </div>
+
+            <div>
+              <h4 className="font-bold text-gray-900 mb-2">Yêu Cầu</h4>
+              <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap">
+                {selectedJob.jobRequirements || "Chưa có yêu cầu"}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 bg-gray-50 rounded-xl">
                 <p className="text-xs text-gray-500 uppercase font-bold mb-1">Ngày Đăng</p>
                 <p className="font-medium text-gray-900">
                   {selectedJob.createdAt ? new Date(selectedJob.createdAt).toLocaleDateString('vi-VN') : "N/A"}
                 </p>
               </div>
               <div className="p-4 bg-gray-50 rounded-xl">
-                <p className="text-xs text-gray-500 uppercase font-bold mb-1">Mức Lương</p>
-                <p className="font-medium text-gray-900">
-                  ${selectedJob.salaryMin} - ${selectedJob.salaryMax}
-                </p>
+                <p className="text-xs text-gray-500 uppercase font-bold mb-1">ưu Tiên</p>
+                <Badge variant={selectedJob.isPriority ? "success" : "secondary"} className="border-none mt-1">
+                  {selectedJob.isPriority ? "Ưu tiên" : "Bình thường"}
+                </Badge>
               </div>
             </div>
-            
+
             <div>
-              <h4 className="font-bold text-gray-900 mb-2">Mô tả công việc</h4>
-              <p className="text-gray-600 text-sm leading-relaxed">
-                {selectedJob.jobDescription || "Chưa có mô tả"}
+              <h4 className="font-bold text-gray-900 mb-2">ID Việc Làm</h4>
+              <p className="text-gray-600 text-sm font-mono bg-gray-50 p-3 rounded-xl break-all">
+                {selectedJob.jobId || selectedJob.id || "N/A"}
               </p>
             </div>
           </div>

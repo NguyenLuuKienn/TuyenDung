@@ -52,6 +52,27 @@ namespace SchneeJob.Controllers
             return Ok(applications);
         }
 
+        [HttpGet("employer")]
+        [Authorize(Roles = "Employer")]
+        public async Task<IActionResult> GetEmployerApplications()
+        {
+            var employerIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(employerIdClaim) || !Guid.TryParse(employerIdClaim, out var employerId))
+            {
+                return Unauthorized("User ID not found in token");
+            }
+
+            try
+            {
+                var applications = await _applicationServices.GetEmployerApplicationsAsync(employerId);
+                return Ok(applications);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error fetching applications", detail = ex.Message });
+            }
+        }
+
         [HttpGet("job/{jobId}")]
         [Authorize(Roles = "Employer")]
         public async Task<IActionResult> GetApplicationsForJob(Guid jobId)
