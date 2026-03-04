@@ -302,7 +302,10 @@ export function EmployerDashboard() {
                             <img src={post.imageUrl} className='h-16 w-16 rounded-lg object-cover flex-shrink-0' alt='' />
                           )}
                           <div className='flex-1 min-w-0'>
-                            <p className='text-sm text-gray-800 font-medium line-clamp-2 leading-relaxed'>{post.content}</p>
+                            <div 
+                              className='text-sm text-gray-800 font-medium line-clamp-2 leading-relaxed prose prose-sm max-w-none'
+                              dangerouslySetInnerHTML={{ __html: post.content }}
+                            />
                             <div className='flex items-center gap-4 mt-2'>
                               <span className='text-[10px] font-bold text-gray-400 uppercase tracking-widest'>
                                 {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : 'Vừa xong'}
