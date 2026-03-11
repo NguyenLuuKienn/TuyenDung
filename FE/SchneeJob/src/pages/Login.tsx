@@ -173,7 +173,7 @@ export function Login() {
                 </button>
               </div>
             )}
-            <form className="space-y-5" onSubmit={handleLogin}>
+            <form className="space-y-5" onSubmit={handleLogin} noValidate>
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">
                   Địa chỉ Email
@@ -187,10 +187,10 @@ export function Login() {
                     name="email"
                     type="email"
                     autoComplete="email"
-                    required
                     disabled={isSubmitting}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    onInvalid={(e) => e.preventDefault()}
                     className={`pl-11 py-2.5 rounded-xl transition-all ${error ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:border-brand focus:ring-brand'}`}
                     placeholder="you@example.com"
                   />
@@ -210,10 +210,10 @@ export function Login() {
                     name="password"
                     type={showPassword ? "text" : "password"}
                     autoComplete="current-password"
-                    required
                     disabled={isSubmitting}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    onInvalid={(e) => e.preventDefault()}
                     className={`pl-11 pr-10 py-2.5 rounded-xl transition-all ${error ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:border-brand focus:ring-brand'}`}
                     placeholder="••••••••"
                   />

@@ -309,16 +309,6 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Role display - disabled when logged in */}
-          {!isLoggedIn && (
-            <button 
-              onClick={toggleRole} 
-              className="text-[10px] uppercase tracking-wider font-bold bg-gray-100 px-3 py-1.5 rounded-full text-gray-500 hidden md:block hover:bg-gray-200 transition-colors cursor-pointer"
-            >
-              Vai trò: {getRoleDisplay(userRole)}
-            </button>
-          )}
-          
           {isLoggedIn && (
             <div className="text-[10px] uppercase tracking-wider font-bold bg-gray-100 px-3 py-1.5 rounded-full text-gray-500 hidden md:block opacity-70">
               {getRoleDisplay(userRole)}

@@ -11,6 +11,9 @@ public class Resume
     [ForeignKey("UserId")]
     public virtual User User { get; set; }
 
+    [StringLength(255)]
+    public string Title { get; set; }
+
     [Required]
     [StringLength(255)]
     public string FileName { get; set; }

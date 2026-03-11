@@ -6,9 +6,11 @@ namespace SchneeJob.Services
     public class CompanyReviewServices : ICompanyReviewServices
     {
         private readonly SchneeJobDbContext _context;
-        public CompanyReviewServices(SchneeJobDbContext context)
+        private readonly INotificationServices _notificationServices;
+        public CompanyReviewServices(SchneeJobDbContext context, INotificationServices notificationServices)
         {
             _context = context;
+            _notificationServices = notificationServices;
         }
         public async Task<IEnumerable<CompanyReview>> GetReviewsForCompanyAsync(Guid companyId)
         {
@@ -44,6 +46,25 @@ namespace SchneeJob.Services
 
             _context.CompanyReviews.Add(review);
             await _context.SaveChangesAsync();
+
+            // Notify company employer
+            var employer = await _context.Users
+                .Include(u => u.UserRoles)
+                    .ThenInclude(ur => ur.Role)
+                .FirstOrDefaultAsync(u => u.CompanyId == review.CompanyId && 
+                    u.UserRoles.Any(ur => ur.Role.RoleName == "Employer"));
+            if (employer != null)
+            {
+                var reviewer = await _context.Users.FindAsync(userId);
+                var reviewerName = review.IsAnonymous ? "Một người dùng (Ẩn danh)" : (reviewer?.FullName ?? "Một người dùng");
+                await _notificationServices.CreateNotificationAsync(
+                    employer.UserId,
+                    "NewCompanyReview",
+                    $"{reviewerName} đã để lại đánh giá {review.Rating} sao cho công ty của bạn.",
+                    $"/companies/{review.CompanyId}/reviews"
+                );
+            }
+
             return review;
         }
 

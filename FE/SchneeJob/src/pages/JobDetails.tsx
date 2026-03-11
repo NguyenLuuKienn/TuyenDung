@@ -9,6 +9,8 @@ import { jobService, companyService, savedJobService, applicationService, resume
 import type { Job, Company } from "@/services";
 import type { Resume } from "@/services/resumeService";
 import Swal from "sweetalert2";
+import { LoginModal } from "@/components/modals/LoginModal";
+import { RegisterModal } from "@/components/modals/RegisterModal";
 
 export function JobDetails() {
   const { id } = useParams();
@@ -25,6 +27,10 @@ export function JobDetails() {
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null);
   const [showApplyModal, setShowApplyModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
+
+  const isLoggedIn = !!localStorage.getItem("token");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -35,17 +41,19 @@ export function JobDetails() {
           const jobData = response.data || (response as any)?.data || null;
           setJob(jobData);
           
-          // Check if job is already saved
-          try {
-            const savedJobsResponse = await savedJobService.getMySavedJobs();
-            const savedJobs = Array.isArray(savedJobsResponse.data) 
-              ? savedJobsResponse.data 
-              : [];
-            const isSaved = savedJobs.some((savedJob: any) => savedJob.jobId === id || savedJob.id === id);
-            setIsJobSaved(isSaved);
-          } catch (err) {
-            console.warn('Failed to check saved status:', err);
-            setIsJobSaved(false);
+          // Only check saved status if logged in
+          if (isLoggedIn) {
+            try {
+              const savedJobsResponse = await savedJobService.getMySavedJobs();
+              const savedJobs = Array.isArray(savedJobsResponse.data) 
+                ? savedJobsResponse.data 
+                : [];
+              const isSaved = savedJobs.some((savedJob: any) => savedJob.jobId === id || savedJob.id === id);
+              setIsJobSaved(isSaved);
+            } catch (err) {
+              console.warn('Failed to check saved status:', err);
+              setIsJobSaved(false);
+            }
           }
           
           // Fetch company info
@@ -85,11 +93,13 @@ export function JobDetails() {
     };
 
     fetchData();
-  }, [id]);
+  }, [id, isLoggedIn]);
 
-  // Fetch resumes
+  // Fetch resumes only when logged in
   useEffect(() => {
     const fetchResumes = async () => {
+      if (!isLoggedIn) return;
+      
       try {
         const res = await resumeService.getMyResumes();
         const resumeData = Array.isArray(res.data) ? res.data : [];
@@ -101,9 +111,14 @@ export function JobDetails() {
     };
 
     fetchResumes();
-  }, []);
+  }, [isLoggedIn]);
 
   const handleSaveJob = async () => {
+    if (!isLoggedIn) {
+      setShowLoginModal(true);
+      return;
+    }
+    
     try {
       setIsSaving(true);
       if (isJobSaved) {
@@ -122,6 +137,14 @@ export function JobDetails() {
       Swal.fire('Lỗi', 'Không thể lưu công việc này', 'error');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleApplyClick = () => {
+    if (!isLoggedIn) {
+      setShowLoginModal(true);
+    } else {
+      setShowApplyModal(true);
     }
   };
 
@@ -237,7 +260,7 @@ export function JobDetails() {
                 <div className="flex flex-col sm:flex-row gap-4">
                   <Button 
                     className="flex-1 rounded-xl bg-[#4A148C] hover:bg-[#380b6e] text-white py-6 text-lg font-bold cursor-pointer" 
-                    onClick={() => setShowApplyModal(true)}
+                    onClick={handleApplyClick}
                     disabled={isApplying}
                   >
                     <Send className="h-5 w-5 mr-2" /> {isApplying ? 'Đang xử lý...' : 'Ứng tuyển ngay'}
@@ -517,6 +540,26 @@ export function JobDetails() {
           </Card>
         </div>
       )}
+
+      {/* Login Modal */}
+      <LoginModal 
+        isOpen={showLoginModal} 
+        onClose={() => setShowLoginModal(false)}
+        onSwitchToRegister={() => {
+          setShowLoginModal(false);
+          setShowRegisterModal(true);
+        }}
+      />
+
+      {/* Register Modal */}
+      <RegisterModal
+        isOpen={showRegisterModal}
+        onClose={() => setShowRegisterModal(false)}
+        onSwitchToRegister={() => {
+          setShowRegisterModal(false);
+          setShowLoginModal(true);
+        }}
+      />
     </div>
   );
 }

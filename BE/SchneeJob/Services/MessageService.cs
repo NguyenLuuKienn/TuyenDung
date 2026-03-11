@@ -8,10 +8,12 @@ namespace SchneeJob.Services
     public class MessageService : IMessageService
     {
         private readonly SchneeJobDbContext _context;
+        private readonly INotificationServices _notificationServices;
 
-        public MessageService(SchneeJobDbContext context)
+        public MessageService(SchneeJobDbContext context, INotificationServices notificationServices)
         {
             _context = context;
+            _notificationServices = notificationServices;
         }
 
         public async Task<IEnumerable<ConversationDto>> GetConversationsAsync(Guid userId)
@@ -125,6 +127,17 @@ namespace SchneeJob.Services
             _context.Messages.Add(message);
             await _context.SaveChangesAsync();
 
+            // Notify receiver about new message
+            var sender = await _context.Users.FindAsync(senderId);
+            var senderName = sender?.FullName ?? "Ai đó";
+            var preview = content.Length > 50 ? content.Substring(0, 47) + "..." : content;
+            await _notificationServices.CreateNotificationAsync(
+                receiverId, 
+                "NewMessage", 
+                $"{senderName} đã gửi tin nhắn mới: {preview}", 
+                $"/chat?conversationId={conversation.ConversationId}"
+            );
+
             // Reload with sender info
             var createdMessage = await _context.Messages
                 .Include(m => m.Sender)
@@ -150,6 +163,16 @@ namespace SchneeJob.Services
             conversation.Status = "Accepted";
             conversation.AcceptedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
+
+            // Notify initiator
+            var otherUser = await _context.Users.FindAsync(userId);
+            var otherName = otherUser?.FullName ?? "Đối tác";
+            await _notificationServices.CreateNotificationAsync(
+                conversation.InitiatedBy, 
+                "ConversationAccepted", 
+                $"{otherName} đã chấp nhận kết nối trò chuyện của bạn", 
+                $"/chat?conversationId={conversation.ConversationId}"
+            );
 
             return true;
         }

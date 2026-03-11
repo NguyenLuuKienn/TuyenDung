@@ -26,12 +26,33 @@ namespace SchneeJob.Controllers
             return Ok(resumes);
         }
 
+        // GET: api/resumes/{id}
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetResume(Guid id)
+        {
+            var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+            var resume = await _resumeServices.GetResumeByIdAsync(id, userId);
+            if (resume == null)
+            {
+                return NotFound("Resume not found");
+            }
+            return Ok(resume);
+        }
+
         // POST: api/resumes
 
         public class AddResumeRequest
         {
+            public string Title { get; set; }
             public string FileName { get; set; }
             public string FileURL { get; set; }
+            public string FileType { get; set; }
+        }
+
+        public class UpdateResumeRequest
+        {
+            public string Title { get; set; }
+            public string FileName { get; set; }
             public string FileType { get; set; }
         }
 
@@ -42,6 +63,7 @@ namespace SchneeJob.Controllers
 
             var newResumeInfo = new Resume
             {
+                Title = request.Title,
                 FileName = request.FileName,
                 FileURL = request.FileURL,
                 FileType = request.FileType
@@ -49,6 +71,32 @@ namespace SchneeJob.Controllers
 
             var createdResume = await _resumeServices.AddResumeAsync(newResumeInfo, userId);
             return Ok(createdResume);
+        }
+
+        // PUT: api/resumes/{id}
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateResume(Guid id, [FromBody] UpdateResumeRequest request)
+        {
+            var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+
+            if (string.IsNullOrWhiteSpace(request.Title))
+            {
+                return BadRequest("Resume title is required");
+            }
+
+            try
+            {
+                var updatedResume = await _resumeServices.UpdateResumeAsync(id, request.Title, request.FileName, request.FileType, userId);
+                if (updatedResume == null)
+                {
+                    return NotFound("Resume not found");
+                }
+                return Ok(updatedResume);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         // DELETE: api/resumes/{resumeId}

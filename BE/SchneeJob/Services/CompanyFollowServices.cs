@@ -6,10 +6,13 @@ namespace SchneeJob.Services
     public class CompanyFollowServices : ICompanyFollowServices
     {
         private readonly SchneeJobDbContext _context;
-        public CompanyFollowServices(SchneeJobDbContext context)
+        private readonly INotificationServices _notificationServices;
+        public CompanyFollowServices(SchneeJobDbContext context, INotificationServices notificationServices)
         {
             _context = context;
+            _notificationServices = notificationServices;
         }
+
         public async Task<CompanyFollow> FollowCompanyAsync(Guid userId, Guid companyId)
         {
             var alreadyExists = await _context.CompanyFollows.AnyAsync(cf => cf.UserId == userId && cf.CompanyId == companyId);
@@ -27,6 +30,25 @@ namespace SchneeJob.Services
 
             _context.CompanyFollows.Add(companyFollow);
             await _context.SaveChangesAsync();
+
+            // Notify company employer if possible
+            var employer = await _context.Users
+                .Include(u => u.UserRoles)
+                    .ThenInclude(ur => ur.Role)
+                .FirstOrDefaultAsync(u => u.CompanyId == companyId && 
+                    u.UserRoles.Any(ur => ur.Role.RoleName == "Employer"));
+            if (employer != null)
+            {
+                var follower = await _context.Users.FindAsync(userId);
+                var followerName = follower?.FullName ?? "Một người dùng";
+                await _notificationServices.CreateNotificationAsync(
+                    employer.UserId,
+                    "NewFollower",
+                    $"{followerName} đã bắt đầu theo dõi công ty của bạn.",
+                    $"/employer/followers"
+                );
+            }
+
             return companyFollow;
         }
         public async Task<bool> UnfollowCompanyAsync(Guid userId, Guid companyId)

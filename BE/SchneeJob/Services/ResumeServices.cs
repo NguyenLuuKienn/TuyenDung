@@ -18,6 +18,12 @@ namespace SchneeJob.Services
                 .ToListAsync();
         }
 
+        public async Task<Resume> GetResumeByIdAsync(Guid resumeId, Guid userId)
+        {
+            return await _context.Resumes
+                .FirstOrDefaultAsync(r => r.ResumeId == resumeId && r.UserId == userId);
+        }
+
         public async Task<Resume> AddResumeAsync(Resume resume, Guid userId)
         {
             resume.UserId = userId;
@@ -25,6 +31,26 @@ namespace SchneeJob.Services
             resume.ResumeId = Guid.NewGuid(); 
 
             _context.Resumes.Add(resume);
+            await _context.SaveChangesAsync();
+            return resume;
+        }
+
+        public async Task<Resume> UpdateResumeAsync(Guid resumeId, string title, string fileName, string fileType, Guid userId)
+        {
+            var resume = await _context.Resumes
+                .FirstOrDefaultAsync(r => r.ResumeId == resumeId && r.UserId == userId);
+
+            if (resume == null)
+            {
+                return null;
+            }
+
+            resume.Title = title;
+            if (!string.IsNullOrWhiteSpace(fileName))
+                resume.FileName = fileName;
+            if (!string.IsNullOrWhiteSpace(fileType))
+                resume.FileType = fileType;
+
             await _context.SaveChangesAsync();
             return resume;
         }
@@ -41,7 +67,7 @@ namespace SchneeJob.Services
             if (isInUse)
             {
                 
-                throw new InvalidOperationException("Cannot delete this resume because it has been used in an application.");
+                throw new InvalidOperationException("Không thể xóa CV này vì nó đã được sử dụng trong ứng tuyển.");
             }
 
             _context.Resumes.Remove(resume);

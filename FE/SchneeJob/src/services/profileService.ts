@@ -109,6 +109,32 @@ const profileService = {
       return { data: 0 };
     }
   },
+
+  /**
+   * Add skill to profile
+   */
+  addSkill: async (skillId: string) => {
+    try {
+      const res = await api.post(`/profile/skills/${skillId}`, {});
+      return res;
+    } catch (error) {
+      console.error('Failed to add skill:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Remove skill from profile
+   */
+  removeSkill: async (skillId: string) => {
+    try {
+      const res = await api.delete(`/profile/skills/${skillId}`);
+      return res;
+    } catch (error) {
+      console.error('Failed to remove skill:', error);
+      throw error;
+    }
+  },
 };
 
 export default profileService;

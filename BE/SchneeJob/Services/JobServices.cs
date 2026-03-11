@@ -66,22 +66,18 @@ namespace SchneeJob.Services
         }
         public async Task<Job> CreateJobAsync(Job job, Guid postByUserId)
         {
-            // Get the employer's user record to find their company
             var employer = await _context.Users.FirstOrDefaultAsync(u => u.UserId == postByUserId);
             if (employer == null)
             {
                 throw new KeyNotFoundException("Employer not found");
             }
 
-            // If employer doesn't have a company, create one automatically
             if (employer.CompanyId == null || employer.CompanyId == Guid.Empty)
             {
-                // Get the pending registration request if available
                 var registrationRequest = await _context.CompanyRegistrations
                     .Where(r => r.ContactPersonEmail == employer.Email && (r.Status == "Pending" || r.Status == "Approved"))
                     .FirstOrDefaultAsync();
 
-                // Create a new company
                 var newCompany = new Company
                 {
                     CompanyId = Guid.NewGuid(),
@@ -95,7 +91,7 @@ namespace SchneeJob.Services
                     City = "",
                     Country = "",
                     CreatedAt = DateTime.UtcNow,
-                    IsVerified = registrationRequest != null // Mark as verified if there was a registration request
+                    IsVerified = registrationRequest != null 
                 };
 
                 _context.Companies.Add(newCompany);

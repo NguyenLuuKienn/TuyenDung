@@ -19,8 +19,9 @@ export interface Resume {
 
 export interface ResumeCreateRequest {
   title: string;
-  fileURL?: string;
-  isDefault?: boolean;
+  fileName: string;
+  fileURL: string;
+  fileType: string;
 }
 
 const resumeService = {
@@ -101,12 +102,42 @@ const resumeService = {
       const formData = new FormData();
       formData.append('file', file);
 
-      const res = await api.post<{ fileURL: string }>('/resumes/upload', formData, {
+      const res = await api.post<{ url: string }>('/files/upload-resume', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       return res;
     } catch (error) {
       console.error('Failed to upload resume file:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get resume by ID
+   */
+  getById: async (resumeId: string) => {
+    try {
+      const res = await api.get<Resume>(`/resumes/${resumeId}`);
+      return res;
+    } catch (error) {
+      console.error(`Failed to get resume ${resumeId}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Update resume (title, name)
+   */
+  update: async (resumeId: string, title: string, fileName: string, fileType: string) => {
+    try {
+      const res = await api.put<Resume>(`/resumes/${resumeId}`, {
+        title,
+        fileName,
+        fileType,
+      });
+      return res;
+    } catch (error) {
+      console.error(`Failed to update resume ${resumeId}:`, error);
       throw error;
     }
   },

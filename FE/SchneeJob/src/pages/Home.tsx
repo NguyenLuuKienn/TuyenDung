@@ -16,6 +16,7 @@ export function Home() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [allJobs, setAllJobs] = useState<Job[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [companies, setCompanies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
@@ -38,13 +39,14 @@ export function Home() {
         let enrichedJobs = jobsData;
         
         // Try to fetch companies for enrichment (optional)
+        let foundCompanies: any[] = [];
         try {
           const companiesResponse = await companyService.getAll();
-          const companiesData = Array.isArray(companiesResponse.data) ? companiesResponse.data : (companiesResponse as any)?.data || [];
+          foundCompanies = Array.isArray(companiesResponse.data) ? companiesResponse.data : (companiesResponse as any)?.data || [];
           
           // Create lookup map for companies
           const companyMap: { [key: string]: any } = {};
-          companiesData.forEach((company: any) => {
+          foundCompanies.forEach((company: any) => {
             companyMap[company.companyId] = company;
           });
           
@@ -61,6 +63,7 @@ export function Home() {
         setAllJobs(enrichedJobs);
         setJobs(enrichedJobs);
         setPosts(postsData);
+        setCompanies(foundCompanies);
         setError(null);
       } catch (err) {
         setError("Không thể tải dữ liệu. Vui lòng thử lại sau.");
@@ -181,8 +184,8 @@ export function Home() {
               </Card>
             ) : (
               <div className="space-y-6">
-                {posts.map((post) => (
-                  <Card key={post.id} className="overflow-hidden border-gray-100">
+                {posts.slice(0, 2).map((post) => (
+                  <Card key={post.id} className="overflow-hidden border-gray-100 shadow-sm hover:shadow-md transition-shadow">
                     <CardHeader className="p-5 pb-2 sm:p-5 sm:pb-2 space-y-0 flex flex-row items-center gap-3">
                       <Avatar src={post.author?.avatar || "https://picsum.photos/seed/user1/100/100"} alt={post.author?.name || "User"} className="h-10 w-10 ring-2 ring-gray-50" />
                       <div>
@@ -262,6 +265,16 @@ export function Home() {
                     </CardContent>
                   </Card>
                 ))}
+                
+                {posts.length > 3 && (
+                  <div className="pt-4 flex justify-center">
+                    <Link to="/posts">
+                      <Button variant="outline" className="rounded-full px-8 cursor-pointer border-gray-200 text-gray-600 hover:bg-gray-50 uppercase tracking-widest text-[10px] font-black">
+                        Xem Thêm Bài Viết
+                      </Button>
+                    </Link>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -338,7 +351,7 @@ export function Home() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {jobs.slice(0, 3).map((job) => (
+            {(jobs.filter(j => j.isPriority) || jobs.slice(0, 3)).slice(0, 3).map((job) => (
               <Card key={`urgent-${job.jobId || job.id}`} className="group hover:border-amber-200 hover:shadow-md transition-all duration-300 relative overflow-hidden">
                 <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] font-bold px-3 py-1 uppercase tracking-wider rounded-bl-xl z-10">
                   Tuyển Gấp
@@ -392,11 +405,11 @@ export function Home() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {jobs.slice(2, 5).map((job) => (
-              <Card key={`immediate-${job.id}`} className="group hover:border-blue-200 hover:shadow-md transition-all duration-300">
+            {(jobs.filter(j => j.isImmediate) || jobs.slice(2, 5)).slice(0, 3).map((job) => (
+              <Card key={`immediate-${job.jobId || job.id}`} className="group hover:border-blue-200 hover:shadow-md transition-all duration-300">
                 <CardContent className="p-6">
                   <div className="flex items-start gap-4 mb-4">
-                    <Avatar src={job.company?.logo || job.logo || "https://picsum.photos/seed/company/100/100"} alt={typeof job.company === 'string' ? job.company : job.company?.name || 'Company'} className="h-12 w-12 rounded-xl border border-gray-100" />
+                    <Avatar src={(typeof job.company === 'string' ? '' : job.company?.logo) || job.logo || "https://picsum.photos/seed/company/100/100"} alt={typeof job.company === 'string' ? job.company : job.company?.name || 'Company'} className="h-12 w-12 rounded-xl border border-gray-100" />
                     <div>
                       <Link to={`/jobs/${job.jobId || job.id}`} className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-1">
                         {job.jobTitle || job.title}
@@ -407,17 +420,21 @@ export function Home() {
                     </div>
                   </div>
                   <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
-                    <div className="flex items-center gap-1"><MapPin className="h-4 w-4 text-gray-400" /> {job.location}</div>
-                    <div className="flex items-center gap-1 font-medium text-emerald-600"><DollarSign className="h-4 w-4" /> ${job.salaryMin} - ${job.salaryMax}</div>
+                    <div className="flex items-center gap-1"><MapPin className="h-4 w-4 text-gray-400" /> {job.location || 'Remote'}</div>
+                    {job.salaryMin && job.salaryMax && (
+                      <div className="flex items-center gap-1 font-medium text-emerald-600"><DollarSign className="h-4 w-4" /> ${job.salaryMin} - ${job.salaryMax}</div>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-2 mb-6">
-                    {Array.isArray(job.skills) && job.skills.slice(0, 3).map(skill => (
-                      <Badge key={skill} variant="secondary" className="bg-gray-50 text-gray-600 font-medium">
-                        {skill}
+                    {(job.jobSkills || job.skills || []).slice(0, 3).map((skill: any) => (
+                      <Badge key={typeof skill === 'string' ? skill : skill.name || skill} variant="secondary" className="bg-gray-50 text-gray-600 font-medium">
+                        {typeof skill === 'string' ? skill : skill.name || skill}
                       </Badge>
                     ))}
                   </div>
-                  <Button className="w-full rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 cursor-pointer">Xem Chi Tiết</Button>
+                  <Link to={`/jobs/${job.jobId || job.id}`}>
+                    <Button className="w-full rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 cursor-pointer font-bold">Xem Chi Tiết</Button>
+                  </Link>
                 </CardContent>
               </Card>
             ))}
@@ -434,27 +451,22 @@ export function Home() {
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              { name: "TechCorp Inc.", logo: "https://logo.clearbit.com/google.com", cover: "https://picsum.photos/seed/techcorp_cover/400/200", industry: "Công nghệ thông tin", location: "Hồ Chí Minh", employees: "1000+", jobs: 12, rating: 4.8 },
-              { name: "Global Solutions", logo: "https://logo.clearbit.com/microsoft.com", cover: "https://picsum.photos/seed/global_cover/400/200", industry: "Phần mềm", location: "Hà Nội", employees: "500-1000", jobs: 8, rating: 4.5 },
-              { name: "InnovateTech", logo: "https://logo.clearbit.com/apple.com", cover: "https://picsum.photos/seed/innovate_cover/400/200", industry: "Phần cứng", location: "Đà Nẵng", employees: "100-500", jobs: 5, rating: 4.9 },
-              { name: "DataSystems", logo: "https://logo.clearbit.com/amazon.com", cover: "https://picsum.photos/seed/data_cover/400/200", industry: "Dữ liệu lớn", location: "Hồ Chí Minh", employees: "1000+", jobs: 15, rating: 4.6 },
-            ].map((company, i) => (
-              <Card key={`company-${company.name}`} className="group hover:border-brand/30 hover:shadow-xl transition-all duration-300 overflow-hidden border-gray-100">
+            {(companies.length > 0 ? companies : []).slice(0, 4).map((company, i) => (
+              <Card key={`company-${company.companyId || company.id || i}`} className="group hover:border-brand/30 hover:shadow-xl transition-all duration-300 overflow-hidden border-gray-100 bg-white">
                 <div className="h-24 w-full relative overflow-hidden">
-                  <img src={company.cover} alt="Cover" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <img src={company.coverPhoto || company.banner || `https://picsum.photos/seed/company_${i}/400/200`} alt="Cover" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
                 </div>
                 <CardContent className="p-5 pt-0 relative">
-                  <div className="absolute -top-10 left-5 h-16 w-16 rounded-2xl border-4 border-white bg-white shadow-sm overflow-hidden">
-                    <img src={company.logo} alt={company.name} className="h-full w-full object-contain p-1" />
+                  <div className="absolute -top-10 left-5 h-16 w-16 rounded-2xl border-4 border-white bg-white shadow-sm overflow-hidden flex items-center justify-center">
+                    <img src={company.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(company.companyName || company.name)}&background=random`} alt={company.companyName || company.name} className="h-full w-full object-contain p-1" />
                   </div>
-                  <div className="pt-8">
-                    <h3 className="font-bold text-gray-900 text-lg mb-1 line-clamp-1">{company.name}</h3>
+                  <div className="pt-10">
+                    <h3 className="font-bold text-gray-900 text-lg mb-1 line-clamp-1">{company.companyName || company.name}</h3>
                     <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
-                      <span className="flex items-center gap-1"><Building2 className="h-3 w-3" /> {company.industry}</span>
+                      <span className="flex items-center gap-1"><Building2 className="h-3 w-3" /> {company.industryName || (typeof company.industry === 'object' ? company.industry?.name : company.industry) || "Công nghệ"}</span>
                       <span>•</span>
-                      <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {company.location}</span>
+                      <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {company.city || company.location || "Việt Nam"}</span>
                     </div>
                     
                     <div className="flex items-center justify-between mb-4 bg-gray-50 p-2.5 rounded-xl border border-gray-100">
@@ -462,7 +474,7 @@ export function Home() {
                         <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Đánh giá</span>
                         <div className="flex items-center gap-1 text-amber-500">
                           <Star className="h-3.5 w-3.5 fill-current" />
-                          <span className="font-bold text-sm text-gray-900">{company.rating}</span>
+                          <span className="font-bold text-sm text-gray-900">{company.rating || (4 + (Math.random() * 0.9)).toFixed(1)}</span>
                         </div>
                       </div>
                       <div className="w-px h-8 bg-gray-200"></div>
@@ -470,14 +482,14 @@ export function Home() {
                         <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Quy mô</span>
                         <div className="flex items-center gap-1 text-gray-900">
                           <Users className="h-3.5 w-3.5 text-brand" />
-                          <span className="font-bold text-sm">{company.employees}</span>
+                          <span className="font-bold text-sm">{company.companySize || company.size || "100+"}</span>
                         </div>
                       </div>
                     </div>
                     
-                    <Link to={`/company/${i}`}>
-                      <Button variant="outline" className="w-full rounded-xl group-hover:bg-brand group-hover:text-white group-hover:border-brand hover:!bg-brand-hover hover:!text-white transition-colors cursor-pointer font-semibold">
-                        {company.jobs} Việc làm đang tuyển
+                    <Link to={`/company/${company.companyId || company.id}`}>
+                      <Button variant="outline" className="w-full rounded-xl group-hover:bg-brand group-hover:text-white group-hover:border-brand hover:!bg-brand-hover hover:!text-white transition-colors cursor-pointer font-semibold uppercase tracking-widest text-[10px]">
+                        Xem chi tiết công ty
                       </Button>
                     </Link>
                   </div>

@@ -49,7 +49,11 @@ axiosInstance.interceptors.response.use(
       localStorage.removeItem('user');
       // Only redirect if not on login or register page
       const currentPath = globalThis.window?.location?.pathname || '';
-      if (!currentPath.includes('/login') && !currentPath.includes('/register')) {
+      // Don't redirect on public pages
+      const publicPaths = ['/login', '/register', '/', '/jobs', '/companies', '/company', '/career-guide'];
+      const isPublic = publicPaths.some(path => currentPath === path || currentPath.startsWith(path + '/'));
+      
+      if (!isPublic) {
         globalThis.window?.location?.assign('/login');
       }
     }

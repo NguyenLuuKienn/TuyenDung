@@ -218,7 +218,7 @@ export function Register() {
               </button>
             </div>
 
-            <form className="space-y-5" onSubmit={handleRegister}>
+            <form className="space-y-5" onSubmit={handleRegister} noValidate>
               <div>
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1.5">
                   {role === "JobSeeker" ? "Họ và Tên" : "Tên Công Ty"} <span className="text-red-500">*</span>
@@ -235,15 +235,15 @@ export function Register() {
                     id="name"
                     name="name"
                     type="text"
-                    required
                     disabled={isSubmitting}
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
+                    onInvalid={(e) => e.preventDefault()}
                     className={`pl-11 py-2.5 rounded-xl transition-all ${validationErrors.fullName ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:border-brand focus:ring-brand'}`}
                     placeholder={role === "JobSeeker" ? "Nguyễn Văn A" : "TechCorp Inc."}
                   />
                 </div>
-                {validationErrors.fullName && <p className="mt-1 text-xs text-red-600">{validationErrors.fullName}</p>}
+                {validationErrors.fullName && <p className="mt-1.5 text-xs font-medium text-red-500">{validationErrors.fullName}</p>}
               </div>
 
               <div>
@@ -259,15 +259,15 @@ export function Register() {
                     name="email"
                     type="email"
                     autoComplete="email"
-                    required
                     disabled={isSubmitting}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    onInvalid={(e) => e.preventDefault()}
                     className={`pl-11 py-2.5 rounded-xl transition-all ${validationErrors.email ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:border-brand focus:ring-brand'}`}
                     placeholder="you@example.com"
                   />
                 </div>
-                {validationErrors.email && <p className="mt-1 text-xs text-red-600">{validationErrors.email}</p>}
+                {validationErrors.email && <p className="mt-1.5 text-xs font-medium text-red-500">{validationErrors.email}</p>}
               </div>
 
               <div>
@@ -282,15 +282,15 @@ export function Register() {
                     id="phone"
                     name="phone"
                     type="tel"
-                    required
                     disabled={isSubmitting}
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
+                    onInvalid={(e) => e.preventDefault()}
                     className={`pl-11 py-2.5 rounded-xl transition-all ${validationErrors.phone ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:border-brand focus:ring-brand'}`}
                     placeholder="0987654321"
                   />
                 </div>
-                {validationErrors.phone && <p className="mt-1 text-xs text-red-600">{validationErrors.phone}</p>}
+                {validationErrors.phone && <p className="mt-1.5 text-xs font-medium text-red-500">{validationErrors.phone}</p>}
               </div>
 
               <div>
@@ -306,10 +306,10 @@ export function Register() {
                     name="password"
                     type={showPassword ? "text" : "password"}
                     autoComplete="new-password"
-                    required
                     disabled={isSubmitting}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    onInvalid={(e) => e.preventDefault()}
                     className={`pl-11 pr-10 py-2.5 rounded-xl transition-all ${validationErrors.password ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:border-brand focus:ring-brand'}`}
                     placeholder="••••••••"
                   />
@@ -322,7 +322,7 @@ export function Register() {
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
-                {validationErrors.password && <p className="mt-1 text-xs text-red-600">{validationErrors.password}</p>}
+                {validationErrors.password && <p className="mt-1.5 text-xs font-medium text-red-500">{validationErrors.password}</p>}
               </div>
 
               <div>
@@ -338,10 +338,10 @@ export function Register() {
                     name="confirm-password"
                     type={showConfirmPassword ? "text" : "password"}
                     autoComplete="new-password"
-                    required
                     disabled={isSubmitting}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
+                    onInvalid={(e) => e.preventDefault()}
                     className={`pl-11 pr-10 py-2.5 rounded-xl transition-all ${validationErrors.confirmPassword ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:border-brand focus:ring-brand'}`}
                     placeholder="••••••••"
                   />
@@ -354,7 +354,7 @@ export function Register() {
                     {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
-                {validationErrors.confirmPassword && <p className="mt-1 text-xs text-red-600">{validationErrors.confirmPassword}</p>}
+                {validationErrors.confirmPassword && <p className="mt-1.5 text-xs font-medium text-red-500">{validationErrors.confirmPassword}</p>}
               </div>
 
               <div className="flex items-start pt-2">
@@ -380,7 +380,7 @@ export function Register() {
                   </Link>
                 </label>
               </div>
-              {validationErrors.terms && <p className="text-xs text-red-600">{validationErrors.terms}</p>}
+              {validationErrors.terms && <p className="mt-1.5 text-xs font-medium text-red-500">{validationErrors.terms}</p>}
 
               <div className="pt-2">
                 <Button type="submit" disabled={isSubmitting} className="w-full py-2.5 rounded-xl text-base font-semibold cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed">

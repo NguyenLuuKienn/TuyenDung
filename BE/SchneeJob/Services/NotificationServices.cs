@@ -1,4 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
+using SchneeJob.Hubs;
 using SchneeJob.Interfaces;
 
 namespace SchneeJob.Services
@@ -6,9 +8,11 @@ namespace SchneeJob.Services
     public class NotificationServices : INotificationServices
     {
         private readonly SchneeJobDbContext _context;
-        public NotificationServices(SchneeJobDbContext context)
+        private readonly IHubContext<NotificationHub> _hubContext;
+        public NotificationServices(SchneeJobDbContext context, IHubContext<NotificationHub> hubContext)
         {
             _context = context;
+            _hubContext = hubContext;
         }
         public async Task<IEnumerable<Notification>> GetUnreadNotificationsAsync(Guid userId)
         {
@@ -47,7 +51,9 @@ namespace SchneeJob.Services
 
             _context.Notifications.Add(notification);
             await _context.SaveChangesAsync();
-            // tích hợp signalR
+            
+            // Push real-time notification via SignalR
+            await _hubContext.Clients.User(userId.ToString()).SendAsync("ReceiveNotification", notification);
         }
     }
 }

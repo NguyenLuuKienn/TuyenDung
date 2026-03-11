@@ -210,7 +210,7 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: RegisterModa
           </button>
         </div>
 
-        <form className="space-y-4" onSubmit={handleRegister}>
+        <form noValidate className="space-y-4" onSubmit={handleRegister}>
           <div>
             <label htmlFor="reg-name" className="block text-xs font-medium text-gray-700 mb-1">
               {role === "JobSeeker" ? "Họ và Tên" : "Tên Công Ty"} <span className="text-red-500">*</span>
@@ -227,10 +227,10 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: RegisterModa
                 id="reg-name"
                 name="name"
                 type="text"
-                required
                 disabled={isSubmitting}
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
+                onInvalid={(e) => e.preventDefault()}
                 className={`pl-10 py-2 rounded-lg text-sm transition-all ${
                   validationErrors.fullName
                     ? "border-red-300 focus:border-red-500 focus:ring-red-500"
@@ -255,10 +255,10 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: RegisterModa
                 name="email"
                 type="email"
                 autoComplete="email"
-                required
                 disabled={isSubmitting}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onInvalid={(e) => e.preventDefault()}
                 className={`pl-10 py-2 rounded-lg text-sm transition-all ${
                   validationErrors.email
                     ? "border-red-300 focus:border-red-500 focus:ring-red-500"
@@ -282,10 +282,10 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: RegisterModa
                 id="reg-phone"
                 name="phone"
                 type="tel"
-                required
                 disabled={isSubmitting}
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
+                onInvalid={(e) => e.preventDefault()}
                 className={`pl-10 py-2 rounded-lg text-sm transition-all ${
                   validationErrors.phone
                     ? "border-red-300 focus:border-red-500 focus:ring-red-500"
@@ -310,10 +310,10 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: RegisterModa
                 name="password"
                 type={showPassword ? "text" : "password"}
                 autoComplete="new-password"
-                required
                 disabled={isSubmitting}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onInvalid={(e) => e.preventDefault()}
                 className={`pl-10 pr-10 py-2 rounded-lg text-sm transition-all ${
                   validationErrors.password
                     ? "border-red-300 focus:border-red-500 focus:ring-red-500"
@@ -346,8 +346,8 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: RegisterModa
                 name="confirm-password"
                 type={showConfirmPassword ? "text" : "password"}
                 autoComplete="new-password"
-                required
                 disabled={isSubmitting}
+                onInvalid={(e) => e.preventDefault()}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className={`pl-10 pr-10 py-2 rounded-lg text-sm transition-all ${

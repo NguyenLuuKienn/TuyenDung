@@ -39,6 +39,32 @@ namespace SchneeJob.Services
             _context.Applications.Add(application);
             await _context.SaveChangesAsync();
 
+            // Notify Employer
+            var job = await _context.Jobs
+                .Include(j => j.Company)
+                .FirstOrDefaultAsync(j => j.JobId == jobId);
+            
+            if (job != null)
+            {
+                // Find potential employer users in that company to notify
+                var employerUsers = await _context.Users
+                    .Include(u => u.UserRoles)
+                        .ThenInclude(ur => ur.Role)
+                    .Where(u => u.CompanyId == job.CompanyId && 
+                        u.UserRoles.Any(ur => ur.Role.RoleName == "Employer"))
+                    .ToListAsync();
+
+                foreach (var emp in employerUsers)
+                {
+                    await _notificationServices.CreateNotificationAsync(
+                        emp.UserId, 
+                        "NewApplication", 
+                        $"You have a new application for '{job.JobTitle}'", 
+                        $"/employer/applications"
+                    );
+                }
+            }
+
             return application;
         }
 
